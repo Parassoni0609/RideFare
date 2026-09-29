@@ -425,7 +425,7 @@ fun RideOptionCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy Link",
+                            contentDescription = "Copy ride details",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
@@ -465,6 +465,14 @@ fun RideOptionCard(
                     }
                 }
             }
+            Text(
+                text = if (ride.provider == RideProvider.UBER)
+                    "In Uber, confirm pickup to see the destination. Check vehicle and price."
+                else "Enter the route in ${ride.provider.displayName}; automatic route transfer is unavailable. Use Copy details above.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }
