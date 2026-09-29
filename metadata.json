@@ -1,0 +1,6 @@
+{
+  "name": "RideFare",
+  "description": "Compare ride rates between Ola, Uber, and Rapido with one-tap deep links to book the cheapest ride.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

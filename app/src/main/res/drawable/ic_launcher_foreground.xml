@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Centered within 66dp safe zone (21 to 87) -->
+    <!-- Car body / Cab -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M34,54 C34,51.8 35.8,50 38,50 L70,50 C72.2,50 74,51.8 74,54 L76,64 C76.5,66 75,68 73,68 L35,68 C33,68 31.5,66 32,64 Z" />
+    <!-- Cab windshield & roof -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,50 L44,40 C44.8,38 46.5,37 48.5,37 L59.5,37 C61.5,37 63.2,38 64,40 L68,50 Z" />
+    <!-- Cab window divider -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M53.5,38 L54.5,38 L54.5,50 L53.5,50 Z" />
+    <!-- Wheels -->
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M36,66 A4,4 0 1,1 44,66 A4,4 0 1,1 36,66 Z" />
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M38.5,66 A1.5,1.5 0 1,1 41.5,66 A1.5,1.5 0 1,1 38.5,66 Z" />
+    <path
+        android:fillColor="#1E293B"
+        android:pathData="M64,66 A4,4 0 1,1 72,66 A4,4 0 1,1 64,66 Z" />
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M66.5,66 A1.5,1.5 0 1,1 69.5,66 A1.5,1.5 0 1,1 66.5,66 Z" />
+    <!-- Headlights -->
+    <path
+        android:fillColor="#FEF08A"
+        android:pathData="M33,57 L38,57 L37,60 L33,60 Z" />
+    <path
+        android:fillColor="#FEF08A"
+        android:pathData="M70,57 L75,57 L75,60 L71,60 Z" />
+
+    <!-- Savings badge floating with Rupee ₹ sign -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M54,23 C62,23 68,29 68,37 C68,45 62,51 54,51 C46,51 40,45 40,37 C40,29 46,23 54,23 Z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M54,23 C62,23 68,29 68,37 C68,45 62,51 54,51 C46,51 40,45 40,37 C40,29 46,23 54,23 Z" />
+    <!-- Rupee symbol in badge -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,30 L58,30 M50,33 L58,33 M53,30 L53,36 C55.5,36 57,37.2 57,39 C57,40.8 55.5,42 53,42 L51,42 M53.5,41 L57.5,46"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round" />
+
+    <!-- Comparison arrows underneath -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M30,76 L78,76"
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M73,72 L78,76 L73,80 Z" />
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M78,82 L30,82"
+        android:strokeColor="#F43F5E"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#F43F5E"
+        android:pathData="M35,78 L30,82 L35,86 Z" />
+</vector>
