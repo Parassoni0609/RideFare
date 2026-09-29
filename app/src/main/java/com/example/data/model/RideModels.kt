@@ -5,7 +5,7 @@ enum class RideProvider(
     val packageName: String,
     val websiteUrl: String
 ) {
-    UBER("Uber", "com.ubercab", "https://m.uber.com/ul"),
+    UBER("Uber", "com.ubercab", "https://m.uber.com/looking"),
     OLA("Ola", "com.olacabs.customer", "https://book.olacabs.com"),
     RAPIDO("Rapido", "com.rapido.passenger", "https://www.rapido.bike")
 }

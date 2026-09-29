@@ -3,17 +3,24 @@ package com.example.data.repository
 import android.content.Context
 import android.location.Address
 import android.location.Geocoder
+import android.location.Location
+import android.net.Uri
 import android.os.Build
+import com.example.data.model.CityData
+import com.example.data.model.validCoordinates
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.ensureActive
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.math.round
 
 data class PlaceSearchResult(
@@ -26,11 +33,33 @@ data class PlaceSearchResult(
 )
 
 object PlaceSearchService {
+    // Search focus only: never used as a selected pickup/drop coordinate.
+    internal fun searchFocus(lat: Double?, lng: Double?, city: String?): Pair<Double, Double>? {
+        if (validCoordinates(lat, lng)) return lat!! to lng!!
+        val places = CityData.supportedCities.firstOrNull { it.name == city }?.popularLocations
+        return places?.takeIf { it.isNotEmpty() }?.let {
+            it.map { p -> p.lat }.average() to it.map { p -> p.lng }.average()
+        }
+    }
 
-    /**
-     * Live Google Maps-like keyword place autocomplete search.
-     * Supports places, shops, societies, hospitals, tech parks, airports, metro stations, roads across India.
-     */
+    internal fun photonUrl(query: String, lat: Double?, lng: Double?, city: String?): String {
+        val focus = searchFocus(lat, lng, city)
+        return Uri.parse("https://photon.komoot.io/api/").buildUpon()
+            .appendQueryParameter("q", query.trim())
+            .appendQueryParameter("countrycode", "IN")
+            .appendQueryParameter("limit", "10")
+            .appendQueryParameter("lang", "en")
+            .apply {
+                focus?.let {
+                    appendQueryParameter("lat", it.first.toString())
+                    appendQueryParameter("lon", it.second.toString())
+                    appendQueryParameter("zoom", "11")
+                    appendQueryParameter("location_bias_scale", "0.2")
+                }
+            }.build().toString()
+    }
+
+    /** India-focused autocomplete. Empty matches and unavailable services are distinct. */
     suspend fun searchPlaces(
         context: Context,
         query: String,
@@ -40,152 +69,108 @@ object PlaceSearchService {
     ): List<PlaceSearchResult> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.length < 2) return@withContext emptyList()
-
-        val results = mutableListOf<PlaceSearchResult>()
-
-        var conn: HttpURLConnection? = null
-        // 1. Live Photon OpenStreetMap Places Search (Autocomplete search engine)
+        var photonSucceeded = false
+        val connection = URL(photonUrl(trimmed, userLat, userLng, cityNameHint))
+            .openConnection() as HttpURLConnection
         try {
-            val encodedQuery = URLEncoder.encode(trimmed, "UTF-8")
-            val urlString = if (userLat != null && userLng != null && userLat != 0.0) {
-                "https://photon.komoot.io/api/?q=$encodedQuery&lat=$userLat&lon=$userLng&limit=10"
-            } else {
-                "https://photon.komoot.io/api/?q=$encodedQuery&limit=10"
-            }
-
-            conn = URL(urlString).openConnection() as HttpURLConnection
-            conn.connectTimeout = 3500
-            conn.readTimeout = 3500
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("User-Agent", "RideFareApp/1.0")
-
-            if (conn.responseCode == 200) {
-                val response = conn.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(response)
-                val features = json.optJSONArray("features")
-                if (features != null) {
-                    for (i in 0 until features.length()) {
-                        val feature = features.getJSONObject(i)
-                        val geometry = feature.optJSONObject("geometry")
-                        val coordinates = geometry?.optJSONArray("coordinates")
-                        val properties = feature.optJSONObject("properties")
-
-                        if (coordinates != null && coordinates.length() >= 2 && properties != null) {
-                            val lng = coordinates.getDouble(0)
-                            val lat = coordinates.getDouble(1)
-                            val name = properties.optString("name", "")
-                            val street = properties.optString("street", "")
-                            val city = properties.optString("city", properties.optString("county", properties.optString("state", "")))
-                            val country = properties.optString("country", "")
-                            val type = properties.optString("type", properties.optString("osm_value", "general"))
-
-                            if (name.isNotBlank() || street.isNotBlank()) {
-                                val title = if (name.isNotBlank()) name else street
-                                val subParts = listOfNotNull(
-                                    if (name.isNotBlank() && street.isNotBlank()) street else null,
-                                    properties.optString("district", ""),
-                                    city,
-                                    properties.optString("postcode", "")
-                                ).filter { it.isNotBlank() && !it.equals(title, ignoreCase = true) }
-
-                                val subtitle = if (subParts.isNotEmpty()) subParts.joinToString(", ") else country
-
-                                val category = when {
-                                    type.contains("aerodrome") || type.contains("airport") || title.contains("airport", ignoreCase = true) -> "airport"
-                                    type.contains("station") || type.contains("railway") || title.contains("railway", ignoreCase = true) || title.contains("station", ignoreCase = true) -> "transit"
-                                    type.contains("subway") || type.contains("metro") || title.contains("metro", ignoreCase = true) -> "metro"
-                                    type.contains("mall") || type.contains("shop") || type.contains("supermarket") || title.contains("mall", ignoreCase = true) -> "shopping"
-                                    type.contains("hospital") || type.contains("clinic") || title.contains("hospital", ignoreCase = true) -> "hospital"
-                                    type.contains("office") || type.contains("commercial") || type.contains("industrial") -> "work"
-                                    else -> "general"
-                                }
-
-                                val dist = if (userLat != null && userLng != null && userLat != 0.0) {
-                                    val r = FloatArray(1)
-                                    android.location.Location.distanceBetween(userLat, userLng, lat, lng, r)
-                                    (round((r[0] / 1000f) * 10f) / 10f)
-                                } else null
-
-                                results.add(
-                                    PlaceSearchResult(
-                                        title = title,
-                                        subtitle = subtitle,
-                                        latitude = lat,
-                                        longitude = lng,
-                                        category = category,
-                                        distanceKm = dist
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.setRequestProperty("User-Agent", "RideFare/1.2 (Android)")
+            if (connection.responseCode != 200) throw IOException("Place search unavailable")
+            val results = parsePhoton(connection.inputStream.bufferedReader().use { it.readText() }, userLat, userLng)
+            ensureActive()
+            photonSucceeded = true
+            // Do not hold valid suggestions behind a slow or unavailable device geocoder.
+            if (results.isNotEmpty()) return@withContext results
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            // Try the device service before reporting a network failure.
         } finally {
-            conn?.disconnect()
+            connection.disconnect()
         }
-        coroutineContext.ensureActive()
-
-        // 2. Android Geocoder
+        ensureActive()
         try {
+            if (!Geocoder.isPresent()) throw IOException("No device geocoder")
             val geocoder = Geocoder(context, Locale.getDefault())
-            val queryWithHint = if (!cityNameHint.isNullOrBlank() && !trimmed.contains(cityNameHint, ignoreCase = true)) {
-                "$trimmed, $cityNameHint, India"
-            } else {
-                "$trimmed, India"
-            }
+            val hint = cityNameHint?.takeIf { it.isNotBlank() && !trimmed.contains(it, true) }
+            val qualified = listOfNotNull(trimmed, hint, "India").joinToString(", ")
+            var addresses = geocode(geocoder, qualified)
+            if (addresses.isEmpty()) addresses = geocode(geocoder, "$trimmed, India")
+            ensureActive()
+            addresses.filter { it.hasLatitude() && it.hasLongitude() &&
+                validCoordinates(it.latitude, it.longitude) && it.countryCode.equals("IN", true)
+            }.map { address ->
+                val title = address.featureName ?: address.thoroughfare ?: trimmed
+                PlaceSearchResult(title, listOfNotNull(address.thoroughfare, address.subLocality,
+                    address.locality, address.adminArea, address.postalCode)
+                    .filter { it.isNotBlank() && !it.equals(title, true) }.distinct().joinToString(", "),
+                    address.latitude, address.longitude, category(title, ""),
+                    distance(userLat, userLng, address.latitude, address.longitude))
+            }.distinctBy { Triple(it.title, it.latitude, it.longitude) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (!photonSucceeded) throw IOException("Place search unavailable. Check your connection and retry.", e)
+            emptyList()
+        }
+    }
 
-            @Suppress("DEPRECATION")
-            var addresses: List<Address>? = geocoder.getFromLocationName(queryWithHint, 6)
-            if (addresses.isNullOrEmpty() && queryWithHint != trimmed) {
-                @Suppress("DEPRECATION")
-                addresses = geocoder.getFromLocationName(trimmed, 6)
-            }
-
-            if (!addresses.isNullOrEmpty()) {
-                for (addr in addresses) {
-                    val lat = addr.latitude
-                    val lng = addr.longitude
-                    val feature = addr.featureName ?: addr.thoroughfare ?: trimmed
-                    val subLocality = addr.subLocality ?: addr.locality ?: ""
-
-                    val full = listOfNotNull(
-                        addr.thoroughfare,
-                        addr.subLocality,
-                        addr.locality,
-                        addr.adminArea,
-                        addr.postalCode
-                    ).filter { it.isNotBlank() && !it.equals(feature, ignoreCase = true) }.joinToString(", ")
-
-                    val dist = if (userLat != null && userLng != null && userLat != 0.0) {
-                        val r = FloatArray(1)
-                        android.location.Location.distanceBetween(userLat, userLng, lat, lng, r)
-                        (round((r[0] / 1000f) * 10f) / 10f)
-                    } else null
-
-                    val alreadyPresent = results.any {
-                        Math.abs(it.latitude - lat) < 0.001 && Math.abs(it.longitude - lng) < 0.001
+    @Suppress("DEPRECATION")
+    private suspend fun geocode(geocoder: Geocoder, query: String): List<Address> {
+        if (Build.VERSION.SDK_INT < 33) return geocoder.getFromLocationName(query, 8).orEmpty()
+        return withTimeoutOrNull(4000) {
+            suspendCancellableCoroutine { continuation ->
+                geocoder.getFromLocationName(query, 8, object : Geocoder.GeocodeListener {
+                    override fun onGeocode(addresses: MutableList<Address>) {
+                        if (continuation.isActive) continuation.resume(addresses)
                     }
-
-                    if (!alreadyPresent) {
-                        results.add(
-                            PlaceSearchResult(
-                                title = feature,
-                                subtitle = if (full.isNotBlank()) full else subLocality,
-                                latitude = lat,
-                                longitude = lng,
-                                category = if (feature.contains("Airport", ignoreCase = true)) "airport" else if (feature.contains("Metro", ignoreCase = true)) "metro" else "general",
-                                distanceKm = dist
-                            )
-                        )
+                    override fun onError(errorMessage: String?) {
+                        if (continuation.isActive) continuation.resumeWithException(IOException("Geocoder unavailable"))
                     }
-                }
+                })
             }
-        } catch (_: Exception) {}
+        } ?: throw IOException("Geocoder timed out")
+    }
 
-        results.distinctBy { "${it.title}_${it.latitude}_${it.longitude}" }
+    internal fun parsePhoton(json: String, lat: Double?, lng: Double?): List<PlaceSearchResult> {
+        val features = JSONObject(json).getJSONArray("features")
+        return (0 until features.length()).mapNotNull { i ->
+            val feature = features.optJSONObject(i) ?: return@mapNotNull null
+            val p = feature.optJSONObject("properties") ?: return@mapNotNull null
+            // Also validate responses: protects against servers ignoring the country filter.
+            if (!p.optString("countrycode").equals("IN", true)) return@mapNotNull null
+            val coordinates = feature.optJSONObject("geometry")?.optJSONArray("coordinates") ?: return@mapNotNull null
+            val x = coordinates.optDouble(0, Double.NaN)
+            val y = coordinates.optDouble(1, Double.NaN)
+            if (!validCoordinates(y, x)) return@mapNotNull null
+            val title = p.optString("name").ifBlank { p.optString("street") }
+            if (title.isBlank()) return@mapNotNull null
+            val subtitle = listOf("housenumber", "street", "district", "city", "county", "state", "postcode")
+                .map { p.optString(it) }.filter { it.isNotBlank() && !it.equals(title, true) }
+                .distinct().joinToString(", ")
+            PlaceSearchResult(title, subtitle, y, x,
+                category(title, p.optString("osm_value")), distance(lat, lng, y, x))
+        }.distinctBy { Triple(it.title, it.latitude, it.longitude) }
+    }
+
+    private fun category(title: String, type: String): String {
+        val value = "$title $type".lowercase(Locale.ROOT)
+        return when {
+            "metro" in value || "subway" in value -> "metro"
+            "airport" in value || "aerodrome" in value -> "airport"
+            "station" in value || "railway" in value -> "transit"
+            "mall" in value || "shop" in value || "supermarket" in value -> "shopping"
+            "hospital" in value || "clinic" in value -> "hospital"
+            "office" in value || "commercial" in value || "industrial" in value -> "work"
+            else -> "general"
+        }
+    }
+
+    private fun distance(lat: Double?, lng: Double?, toLat: Double, toLng: Double): Float? {
+        if (!validCoordinates(lat, lng)) return null
+        val result = FloatArray(1)
+        Location.distanceBetween(lat!!, lng!!, toLat, toLng, result)
+        return round(result[0] / 100f) / 10f
     }
 }

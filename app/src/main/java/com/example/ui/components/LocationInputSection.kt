@@ -111,9 +111,12 @@ fun LocationInputSection(
 ) {
     val context = LocalContext.current
     var activeField by remember { mutableStateOf(ActiveSearchField.NONE) }
-    var selectedCategoryFilter by remember { mutableStateOf("all") }
+    var selectedCategoryFilter by remember(activeField, currentCity.id) { mutableStateOf("all") }
     var isSearchingLive by remember { mutableStateOf(false) }
     var liveSearchResults by remember { mutableStateOf<List<PlaceSearchResult>>(emptyList()) }
+
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var retrySearch by remember { mutableStateOf(0) }
 
     val activeQuery = when (activeField) {
         ActiveSearchField.PICKUP -> pickup
@@ -121,8 +124,10 @@ fun LocationInputSection(
         ActiveSearchField.NONE -> ""
     }
 
-    // Trigger live Google Maps-like keyword search with 300ms debounce
-    LaunchedEffect(activeQuery, activeField, currentCity.name) {
+    // Trigger live place keyword search with 300ms debounce
+    LaunchedEffect(activeQuery, activeField, currentCity.name, pickupLat, pickupLng, retrySearch) {
+        liveSearchResults = emptyList()
+        searchError = null
         if (activeField == ActiveSearchField.NONE || activeQuery.length < 2 || activeQuery.startsWith("Current Location")) {
             liveSearchResults = emptyList()
             isSearchingLive = false
@@ -144,6 +149,7 @@ fun LocationInputSection(
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            searchError = "Place search is unavailable. Check your connection and tap to retry."
             liveSearchResults = emptyList()
         } finally {
             isSearchingLive = false
@@ -214,7 +220,7 @@ fun LocationInputSection(
                                 activeField = ActiveSearchField.PICKUP
                             }
                         },
-                        placeholder = if (isLocating) "Detecting current location via GPS..." else "Search pickup location (Google Maps style)...",
+                        placeholder = if (isLocating) "Detecting current location via GPS..." else "Search pickup address or landmark...",
                         label = "PICKUP LOCATION",
                         testTag = "pickup_location_input",
                         trailingContent = {
@@ -327,7 +333,7 @@ fun LocationInputSection(
                 }
             }
 
-            // AUTO-SUGGESTION DROPDOWN (Google Maps-like live search)
+            // AUTO-SUGGESTION DROPDOWN (place live search)
             AnimatedVisibility(
                 visible = activeField != ActiveSearchField.NONE,
                 enter = fadeIn() + expandVertically(),
@@ -493,7 +499,7 @@ fun LocationInputSection(
                             }
                         }
 
-                        // 1. LIVE GOOGLE MAPS-STYLE SEARCH RESULTS (Photon + Geocoder)
+                        // 1. LIVE PLACE SEARCH RESULTS (Photon + Geocoder)
                         if (liveSearchResults.isNotEmpty()) {
                             val filteredLive = if (selectedCategoryFilter == "all") {
                                 liveSearchResults
@@ -531,6 +537,22 @@ fun LocationInputSection(
                                     }
                                 )
                             }
+                        }
+
+                        if (!isSearchingLive && activeQuery.trim().length >= 2) {
+                            val filteredOut = liveSearchResults.isNotEmpty() && selectedCategoryFilter != "all" &&
+                                liveSearchResults.none { it.category == selectedCategoryFilter }
+                            val message = searchError ?: when {
+                                filteredOut -> "No matches in this category. Tap All above."
+                                liveSearchResults.isEmpty() -> "No online matches. Add an area or city, or choose a suggested landmark."
+                                else -> null
+                            }
+                            if (message != null) Text(
+                                text = message,
+                                modifier = Modifier.padding(8.dp).clickable(enabled = searchError != null) { retrySearch++ },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
 
                         // Custom query fallback

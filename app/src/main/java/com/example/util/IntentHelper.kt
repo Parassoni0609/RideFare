@@ -4,7 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import org.json.JSONObject
 import android.net.Uri
 import android.widget.Toast
 import com.example.data.model.validCoordinates
@@ -54,98 +54,68 @@ object IntentHelper {
         val dLat = dropLat!!
         val dLng = dropLng!!
 
-        val encPickup = Uri.encode(pickup.ifBlank { "Current Location" })
-        val encDrop = Uri.encode(drop.ifBlank { "Destination" })
-
-        val isUber = option.provider == RideProvider.UBER
-        val isOla = option.provider == RideProvider.OLA
-        val isRapido = option.provider == RideProvider.RAPIDO
-
-        // 1. UBER DEEP LINKING
-        if (isUber) {
-            val uberSchemeUri = "uber://?action=setPickup&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[nickname]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[nickname]=$encDrop&dropoff[formatted_address]=$encDrop"
-
-            if (tryLaunchUri(context, uberSchemeUri, "com.ubercab") ||
-                tryLaunchUri(context, uberSchemeUri, "com.ubercab.uberlite") ||
-                tryLaunchUri(context, uberSchemeUri, null)
-            ) {
-                Toast.makeText(context, "Opening Uber. Confirm addresses, vehicle and price.", Toast.LENGTH_SHORT).show()
+        if (option.provider == RideProvider.UBER) {
+            val native = uberUri(pickup, drop, pLat, pLng, dLat, dLng, false)
+            // Try each explicit package before any implicit/browser fallback.
+            if (tryLaunchUri(context, native.toString(), "com.ubercab") ||
+                tryLaunchUri(context, native.toString(), "com.ubercab.uberlite") ||
+                tryLaunchUri(context, native.toString())) {
+                Toast.makeText(context, "Confirm pickup in Uber to see the destination, then check vehicle and price.", Toast.LENGTH_LONG).show()
                 return
             }
-
-            // Universal App Link
-            val uberWebAppLink = "https://m.uber.com/ul/?action=setPickup&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[formatted_address]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[formatted_address]=$encDrop"
-            if (tryLaunchUri(context, uberWebAppLink, null)) {
-                Toast.makeText(context, "Opening Uber...", Toast.LENGTH_SHORT).show()
-                return
-            }
-        }
-
-        // Ola/Rapido destination URI formats are unverified. Open their app and
-        // let the user enter/confirm the route rather than claiming it was set.
-        if (isOla || isRapido) {
+            val web = uberUri(pickup, drop, pLat, pLng, dLat, dLng, true)
+            if (tryLaunchUri(context, web.toString())) return
+        } else {
+            // These providers do not have a configured, verified route-prefill integration.
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
                 try {
                     context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    Toast.makeText(context, "Opening $providerName. Enter your route and confirm price and vehicle in the app.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Enter pickup and destination in $providerName. Route transfer is not supported.", Toast.LENGTH_LONG).show()
                     return
-                } catch (_: Exception) { }
+                } catch (_: android.content.ActivityNotFoundException) {
+                } catch (_: SecurityException) { }
             }
         }
+        // A marketing homepage is not a booking fallback. Offer the actual app listing.
+        if (tryLaunchUri(context, "market://details?id=$packageName") ||
+            tryLaunchUri(context, "https://play.google.com/store/apps/details?id=$packageName")) {
+            Toast.makeText(context, "Install or enable $providerName, then retry from RideFare.", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(context, "No app or browser can open $providerName. Use Copy details to keep your route.", Toast.LENGTH_LONG).show()
+        }
+    }
 
-        // 4. General Web/Store Fallback
-        val fallbackUrl = when {
-            isUber -> "https://m.uber.com/ul/?dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[formatted_address]=$encDrop"
-            isOla -> option.provider.websiteUrl
-            isRapido -> option.provider.websiteUrl
-            else -> option.webFallbackUrl
-        }
-
-        try {
-            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(webIntent)
-            Toast.makeText(context, "Opening in $providerName...", Toast.LENGTH_SHORT).show()
-        } catch (_: Exception) {
-            try {
-                val storeIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(storeIntent)
-            } catch (_: Exception) {
-                val playStoreWebIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                try { context.startActivity(playStoreWebIntent) } catch (_: Exception) {
-                    Toast.makeText(context, "No app or browser is available to open this provider.", Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+    internal fun uberUri(pickup: String, drop: String, pLat: Double, pLng: Double,
+                         dLat: Double, dLng: Double, web: Boolean): Uri {
+        require(validCoordinates(pLat, pLng) && validCoordinates(dLat, dLng))
+        fun location(name: String, lat: Double, lng: Double) = JSONObject()
+            .put("latitude", lat).put("longitude", lng)
+            .put("addressLine1", name).put("addressLine2", name).toString()
+        if (web) return Uri.parse("https://m.uber.com/looking").buildUpon()
+            .appendQueryParameter("pickup", location(pickup, pLat, pLng))
+            .appendQueryParameter("drop[0]", location(drop, dLat, dLng)).build()
+        return Uri.parse("uber://riderequest").buildUpon()
+            .appendQueryParameter("pickup[latitude]", pLat.toString())
+            .appendQueryParameter("pickup[longitude]", pLng.toString())
+            .appendQueryParameter("pickup[nickname]", pickup)
+            .appendQueryParameter("pickup[formatted_address]", pickup)
+            .appendQueryParameter("dropoff[latitude]", dLat.toString())
+            .appendQueryParameter("dropoff[longitude]", dLng.toString())
+            .appendQueryParameter("dropoff[nickname]", drop)
+            .appendQueryParameter("dropoff[formatted_address]", drop).build()
     }
 
     private fun tryLaunchUri(context: Context, uriString: String, packageName: String? = null): Boolean {
         return try {
-            val uri = Uri.parse(uriString)
-            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-                if (!packageName.isNullOrBlank()) {
-                    setPackage(packageName)
-                }
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
+                packageName?.let { setPackage(it) }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
+            })
             true
-        } catch (_: Exception) {
-            if (!packageName.isNullOrBlank()) {
-                try {
-                    val implicitIntent = Intent(Intent.ACTION_VIEW, Uri.parse(uriString)).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(implicitIntent)
-                    return true
-                } catch (_: Exception) {}
-            }
+        } catch (_: android.content.ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
             false
         }
     }

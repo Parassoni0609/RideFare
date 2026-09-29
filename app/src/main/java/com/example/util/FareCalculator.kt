@@ -494,19 +494,9 @@ object FareCalculator {
             totalFare = totalFare
         )
 
-        // Construct high fidelity Deep links & web fallbacks
-        val encodedPickup = encode(pickup)
-        val encodedDrop = encode(drop)
-
-        val (deepLink, webLink) = when (provider) {
-            RideProvider.UBER -> {
-                val dl = "uber://?action=setPickup&pickup=my_location&dropoff[formatted_address]=$encodedDrop"
-                val wl = "https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=$encodedDrop"
-                dl to wl
-            }
-            RideProvider.OLA -> "" to RideProvider.OLA.websiteUrl
-            RideProvider.RAPIDO -> "" to RideProvider.RAPIDO.websiteUrl
-        }
+        // Estimates have names, not resolved endpoints. Build route links only at handoff.
+        val deepLink = if (provider == RideProvider.UBER) "uber://riderequest" else ""
+        val webLink = provider.websiteUrl
 
         return RideOption(
             id = id,
