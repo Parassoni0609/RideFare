@@ -128,7 +128,7 @@ fun CheapestDealHeroCard(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "CHEAPEST RIDE OVERALL",
+                                text = "LOWEST FARE ESTIMATE",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Black,
                                     fontSize = 10.sp,
@@ -145,7 +145,7 @@ fun CheapestDealHeroCard(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "Save ₹${cheapestRide.savingsVsHighest}",
+                                text = "Gap ₹${cheapestRide.savingsVsHighest}",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.ExtraBold,
@@ -275,7 +275,7 @@ fun CheapestDealHeroCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Driver: ${cheapestRide.etaMinutes} mins away",
+                            text = "Estimated pickup: ~${cheapestRide.etaMinutes} min",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
@@ -315,7 +315,7 @@ fun CheapestDealHeroCard(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Book on ${cheapestRide.provider.displayName} for ₹${cheapestRide.totalFare}",
+                            text = "Open ${cheapestRide.provider.displayName} • confirm price",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp

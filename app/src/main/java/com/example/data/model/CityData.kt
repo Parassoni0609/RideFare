@@ -1,12 +1,5 @@
 package com.example.data.model
 
-data class ServiceAvailabilityResult(
-    val isAvailable: Boolean,
-    val cityName: String,
-    val availableProviders: List<RideProvider>,
-    val unavailableReason: String? = null
-)
-
 object CityData {
     val supportedCities = listOf(
         CityInfo(
@@ -263,10 +256,12 @@ object CityData {
     fun getCityByNameOrId(query: String): CityInfo {
         val trimmed = query.trim()
         val found = supportedCities.find {
-            it.id.equals(trimmed, ignoreCase = true) ||
-            it.name.equals(trimmed, ignoreCase = true) ||
-            it.name.contains(trimmed, ignoreCase = true) ||
-            trimmed.contains(it.name, ignoreCase = true)
+            trimmed.isNotBlank() && (
+                it.id.equals(trimmed, ignoreCase = true) ||
+                it.name.equals(trimmed, ignoreCase = true) ||
+                it.name.contains(trimmed, ignoreCase = true) ||
+                trimmed.contains(it.name, ignoreCase = true)
+            )
         }
         if (found != null) return found
 
@@ -278,64 +273,7 @@ object CityData {
         return CityInfo(
             id = displayName.lowercase().replace(" ", "_"),
             name = displayName,
-            popularLocations = listOf(
-                PresetLocation("$displayName City Center", "Main Market / Central Junction", 0.0, 0.0, "general"),
-                PresetLocation("$displayName Railway Station", "Main Railway Station Concourse", 0.0, 0.0, "transit"),
-                PresetLocation("$displayName Bus Stand / ISBT", "Central Bus Station", 0.0, 0.0, "transit")
-            )
-        )
-    }
-
-    /**
-     * Universal Service Coverage Matrix.
-     * Evaluates whether Uber, Ola, and/or Rapido operate in the given city/region.
-     * If in an uninhabited, remote wilderness, or outside operational zones, returns isAvailable = false.
-     */
-    fun checkServiceCoverage(cityName: String?, lat: Double?, lng: Double?): ServiceAvailabilityResult {
-        val name = cityName?.trim()?.lowercase() ?: ""
-
-        // 1. Check coordinates if available
-        if (lat != null && lng != null && (lat != 0.0 || lng != 0.0)) {
-            // Check bounding box for India (approx lat 6.5..37.5, lng 68.0..97.5)
-            val isInsideIndia = (lat in 6.0..38.0 && lng in 67.0..98.0)
-            if (!isInsideIndia) {
-                return ServiceAvailabilityResult(
-                    isAvailable = false,
-                    cityName = cityName ?: "Current Location",
-                    availableProviders = emptyList(),
-                    unavailableReason = "Ola, Uber, and Rapido are currently only operational within India. No ride services available in this location."
-                )
-            }
-        }
-
-        // 2. Specific known remote/non-operational keywords
-        val unsupportedKeywords = listOf(
-            "antarctica", "sahara", "pacific", "atlantic", "wilderness",
-            "remote forest", "desert center", "uninhabited", "island peak"
-        )
-        if (unsupportedKeywords.any { name.contains(it) }) {
-            return ServiceAvailabilityResult(
-                isAvailable = false,
-                cityName = cityName ?: "This Region",
-                availableProviders = emptyList(),
-                unavailableReason = "Ola, Uber, and Rapido do not currently operate in this remote region."
-            )
-        }
-
-        // 3. Check specific provider coverage across Indian cities
-        val uberUnavailableSmallCities = listOf("remote", "village", "taluka", "rural")
-        val isUberUnavailable = uberUnavailableSmallCities.any { name.contains(it) }
-
-        val activeProviders = if (isUberUnavailable) {
-            listOf(RideProvider.OLA, RideProvider.RAPIDO)
-        } else {
-            listOf(RideProvider.OLA, RideProvider.UBER, RideProvider.RAPIDO)
-        }
-
-        return ServiceAvailabilityResult(
-            isAvailable = true,
-            cityName = cityName?.ifBlank { "Current City" } ?: "Current City",
-            availableProviders = activeProviders
+            popularLocations = emptyList()
         )
     }
 

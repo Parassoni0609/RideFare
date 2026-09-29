@@ -80,6 +80,8 @@ import com.example.ui.theme.Slate100
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate400
 import com.example.ui.theme.Slate700
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 
 enum class ActiveSearchField {
@@ -137,7 +139,10 @@ fun LocationInputSection(
                 userLng = pickupLng,
                 cityNameHint = currentCity.name
             )
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
             liveSearchResults = results
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             liveSearchResults = emptyList()
         } finally {
@@ -236,7 +241,7 @@ fun LocationInputSection(
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
                                         text = when {
-                                            isCurrentLocationActive -> "GPS Live"
+                                            isCurrentLocationActive -> "GPS Pickup"
                                             isLocating -> "Locating..."
                                             else -> "Use GPS"
                                         },
@@ -477,7 +482,7 @@ fun LocationInputSection(
                                             )
                                         )
                                         Text(
-                                            text = "Detects your live location for instant driver pickup",
+                                            text = "Use GPS coordinates as your pickup point",
                                             style = MaterialTheme.typography.bodySmall.copy(
                                                 fontSize = 11.sp,
                                                 color = Slate700

@@ -1,5 +1,6 @@
 package com.example.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -14,6 +15,16 @@ data class SavedRoute(
     val isFavorite: Boolean = true,
     val priceAlertEnabled: Boolean = false,
     val priceThreshold: Int = 250,
+    val pickupLat: Double? = null,
+    val pickupLng: Double? = null,
+    val dropLat: Double? = null,
+    val dropLng: Double? = null,
+    @ColumnInfo(defaultValue = "''")
+    val cityId: String = "",
+    @ColumnInfo(defaultValue = "'NORMAL'")
+    val trafficCondition: String = "NORMAL",
+    @ColumnInfo(defaultValue = "'REGULAR'")
+    val weatherCondition: String = "REGULAR",
     val createdAt: Long = System.currentTimeMillis()
 )
 

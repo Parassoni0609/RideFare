@@ -14,6 +14,9 @@ interface RideDao {
     @Query("SELECT * FROM saved_routes ORDER BY isFavorite DESC, createdAt DESC")
     fun getAllSavedRoutes(): Flow<List<SavedRoute>>
 
+    @Query("SELECT * FROM saved_routes WHERE id = :id LIMIT 1")
+    suspend fun getSavedRoute(id: Long): SavedRoute?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSavedRoute(route: SavedRoute): Long
 

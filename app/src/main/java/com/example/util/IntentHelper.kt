@@ -7,10 +7,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
-import com.example.data.model.CityData
+import com.example.data.model.validCoordinates
 import com.example.data.model.RideOption
 import com.example.data.model.RideProvider
-import com.example.data.model.VehicleCategory
 
 object IntentHelper {
 
@@ -29,15 +28,14 @@ object IntentHelper {
     }
 
     /**
-     * Launches Ola, Uber, or Rapido with pre-filled destination coordinates,
-     * pickup coordinates, and location labels via deep link URL intents.
+     * Offers an external provider handoff, never a confirmed booking.
+     * Uber receives resolved coordinates; Ola/Rapido require route entry in their app.
      */
     fun bookRide(
         context: Context,
         option: RideOption,
         pickup: String,
         drop: String,
-        isCurrentLocation: Boolean = false,
         pickupLat: Double? = null,
         pickupLng: Double? = null,
         dropLat: Double? = null,
@@ -46,10 +44,15 @@ object IntentHelper {
         val providerName = option.provider.displayName
         val packageName = option.provider.packageName
 
-        val pLat = pickupLat ?: 12.9344
-        val pLng = pickupLng ?: 77.6253
-        val dLat = dropLat ?: (pLat + 0.05)
-        val dLng = dropLng ?: (pLng + 0.05)
+        if (!validCoordinates(pickupLat, pickupLng) || !validCoordinates(dropLat, dropLng) ||
+            pickup.isBlank() || drop.isBlank()) {
+            Toast.makeText(context, "Select valid pickup and destination addresses first.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val pLat = pickupLat!!
+        val pLng = pickupLng!!
+        val dLat = dropLat!!
+        val dLng = dropLng!!
 
         val encPickup = Uri.encode(pickup.ifBlank { "Current Location" })
         val encDrop = Uri.encode(drop.ifBlank { "Destination" })
@@ -60,108 +63,42 @@ object IntentHelper {
 
         // 1. UBER DEEP LINKING
         if (isUber) {
-            val uberSchemeUri = if (isCurrentLocation || pickup.contains("Current Location", ignoreCase = true)) {
-                "uber://?action=setPickup&pickup=my_location&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[nickname]=$encDrop&dropoff[formatted_address]=$encDrop"
-            } else {
-                "uber://?action=setPickup&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[nickname]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[nickname]=$encDrop&dropoff[formatted_address]=$encDrop"
-            }
+            val uberSchemeUri = "uber://?action=setPickup&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[nickname]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[nickname]=$encDrop&dropoff[formatted_address]=$encDrop"
 
             if (tryLaunchUri(context, uberSchemeUri, "com.ubercab") ||
                 tryLaunchUri(context, uberSchemeUri, "com.ubercab.uberlite") ||
                 tryLaunchUri(context, uberSchemeUri, null)
             ) {
-                Toast.makeText(context, "Opening Uber with destination set...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Opening Uber. Confirm addresses, vehicle and price.", Toast.LENGTH_SHORT).show()
                 return
             }
 
             // Universal App Link
-            val uberWebAppLink = "https://m.uber.com/ul/?action=setPickup&client_id=ridefare&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[formatted_address]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[formatted_address]=$encDrop"
+            val uberWebAppLink = "https://m.uber.com/ul/?action=setPickup&pickup[latitude]=$pLat&pickup[longitude]=$pLng&pickup[formatted_address]=$encPickup&dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[formatted_address]=$encDrop"
             if (tryLaunchUri(context, uberWebAppLink, null)) {
                 Toast.makeText(context, "Opening Uber...", Toast.LENGTH_SHORT).show()
                 return
             }
         }
 
-        // 2. OLA DEEP LINKING
-        if (isOla) {
-            val olaCategory = when (option.category) {
-                VehicleCategory.BIKE -> "bike"
-                VehicleCategory.AUTO -> "auto"
-                VehicleCategory.CAB_PREMIUM, VehicleCategory.CAB_XL -> "prime"
-                else -> "micro"
-            }
-
-            val olaUri1 = "olacabs://app/launch?lat=$pLat&lng=$pLng&drop_lat=$dLat&drop_lng=$dLng&drop_name=$encDrop&pickup_name=$encPickup&category=$olaCategory"
-            val olaUri2 = "ola://ola/rides?action=request&pickup_lat=$pLat&pickup_lng=$pLng&pickup_name=$encPickup&drop_lat=$dLat&drop_lng=$dLng&drop_name=$encDrop"
-            val olaUri3 = "ola://rides?drop_lat=$dLat&drop_lng=$dLng&drop_name=$encDrop"
-
-            if (tryLaunchUri(context, olaUri1, "com.olacabs.customer") ||
-                tryLaunchUri(context, olaUri2, "com.olacabs.customer") ||
-                tryLaunchUri(context, olaUri3, "com.olacabs.customer") ||
-                tryLaunchUri(context, olaUri1, null)
-            ) {
-                Toast.makeText(context, "Opening Ola with destination set...", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            // Direct Package Launch fallback
-            val launchIntent = context.packageManager.getLaunchIntentForPackage("com.olacabs.customer")
+        // Ola/Rapido destination URI formats are unverified. Open their app and
+        // let the user enter/confirm the route rather than claiming it was set.
+        if (isOla || isRapido) {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                launchIntent.putExtra("drop_lat", dLat)
-                launchIntent.putExtra("drop_lng", dLng)
-                launchIntent.putExtra("drop_name", drop)
-                context.startActivity(launchIntent)
-                Toast.makeText(context, "Opening Ola App...", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            // Web Universal Fallback
-            val olaWebUrl = "https://book.olacabs.com/?pickup_lat=$pLat&pickup_lng=$pLng&pickup_name=$encPickup&drop_lat=$dLat&drop_lng=$dLng&drop_name=$encDrop"
-            if (tryLaunchUri(context, olaWebUrl, null)) {
-                Toast.makeText(context, "Opening Ola...", Toast.LENGTH_SHORT).show()
-                return
-            }
-        }
-
-        // 3. RAPIDO DEEP LINKING
-        if (isRapido) {
-            val rapidoUri1 = "rapido://booking?pickup_lat=$pLat&pickup_lng=$pLng&drop_lat=$dLat&drop_lng=$dLng&pickup_address=$encPickup&drop_address=$encDrop"
-            val rapidoUri2 = "rapido://ride?pickup=$encPickup&drop=$encDrop&pickup_lat=$pLat&pickup_lng=$pLng&drop_lat=$dLat&drop_lng=$dLng"
-
-            if (tryLaunchUri(context, rapidoUri1, "com.rapido.passenger") ||
-                tryLaunchUri(context, rapidoUri2, "com.rapido.passenger") ||
-                tryLaunchUri(context, rapidoUri1, null)
-            ) {
-                Toast.makeText(context, "Opening Rapido with destination set...", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            // Direct Package Launch fallback
-            val launchIntent = context.packageManager.getLaunchIntentForPackage("com.rapido.passenger")
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                launchIntent.putExtra("drop_lat", dLat)
-                launchIntent.putExtra("drop_lng", dLng)
-                launchIntent.putExtra("drop_name", drop)
-                context.startActivity(launchIntent)
-                Toast.makeText(context, "Opening Rapido App...", Toast.LENGTH_SHORT).show()
-                return
-            }
-
-            // Web Universal Fallback
-            val rapidoWebUrl = "https://www.rapido.bike/booking?pickup_lat=$pLat&pickup_lng=$pLng&drop_lat=$dLat&drop_lng=$dLng&pickup=$encPickup&drop=$encDrop"
-            if (tryLaunchUri(context, rapidoWebUrl, null)) {
-                Toast.makeText(context, "Opening Rapido...", Toast.LENGTH_SHORT).show()
-                return
+                try {
+                    context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    Toast.makeText(context, "Opening $providerName. Enter your route and confirm price and vehicle in the app.", Toast.LENGTH_LONG).show()
+                    return
+                } catch (_: Exception) { }
             }
         }
 
         // 4. General Web/Store Fallback
         val fallbackUrl = when {
             isUber -> "https://m.uber.com/ul/?dropoff[latitude]=$dLat&dropoff[longitude]=$dLng&dropoff[formatted_address]=$encDrop"
-            isOla -> "https://book.olacabs.com/?drop_lat=$dLat&drop_lng=$dLng&drop_name=$encDrop"
-            isRapido -> "https://www.rapido.bike/booking?drop_lat=$dLat&drop_lng=$dLng"
+            isOla -> option.provider.websiteUrl
+            isRapido -> option.provider.websiteUrl
             else -> option.webFallbackUrl
         }
 
@@ -181,7 +118,9 @@ object IntentHelper {
                 val playStoreWebIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                context.startActivity(playStoreWebIntent)
+                try { context.startActivity(playStoreWebIntent) } catch (_: Exception) {
+                    Toast.makeText(context, "No app or browser is available to open this provider.", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -218,8 +157,9 @@ object IntentHelper {
             Route: $pickup ➔ $drop
             Service: ${option.serviceName} (${option.provider.displayName})
             Estimated Fare: ₹${option.totalFare}
-            ETA: ~${option.etaMinutes} mins | Trip: ~${option.tripDurationMinutes} mins
-            Book link: ${option.webFallbackUrl}
+            Estimated pickup: ~${option.etaMinutes} mins | Trip: ~${option.tripDurationMinutes} mins
+            Provider link: ${option.webFallbackUrl}
+            Confirm price, addresses, category and availability in the provider app.
         """.trimIndent()
 
         val clip = ClipData.newPlainText("Ride Booking Link", text)
@@ -232,13 +172,13 @@ object IntentHelper {
             type = "text/plain"
             putExtra(
                 Intent.EXTRA_SUBJECT,
-                "Cheapest Ride found on RideFare"
+                "RideFare estimated comparison"
             )
             putExtra(
                 Intent.EXTRA_TEXT,
-                "Found cheapest ride from $pickup to $drop!\n" +
-                        "🏆 ${cheapest.serviceName} for only ₹${cheapest.totalFare} (saves ₹${cheapest.savingsVsHighest})!\n" +
-                        "Book directly: ${cheapest.webFallbackUrl}"
+                "Estimated comparison from $pickup to $drop.\n" +
+                        "${cheapest.serviceName}: estimated ₹${cheapest.totalFare}. Difference vs highest estimate: ₹${cheapest.savingsVsHighest}.\n" +
+                        "Confirm actual price and availability in the provider app: ${cheapest.webFallbackUrl}"
             )
         }
         context.startActivity(Intent.createChooser(shareIntent, "Share Ride Deal"))

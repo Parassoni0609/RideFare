@@ -89,7 +89,7 @@ fun ProviderEtaComparisonBar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(28.dp)
@@ -107,14 +107,14 @@ fun ProviderEtaComparisonBar(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = "Live Driver ETA & Cost Comparison",
+                            text = "Pickup & fare estimates",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
                         )
                         Text(
-                            text = "Arrival times & starting rates by provider",
+                            text = "Sample rates • availability unverified",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontSize = 10.sp,
                                 color = Slate400
@@ -140,7 +140,7 @@ fun ProviderEtaComparisonBar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh ETAs",
+                            contentDescription = "Recalculate estimates",
                             tint = Slate700,
                             modifier = Modifier
                                 .size(13.dp)
@@ -148,7 +148,7 @@ fun ProviderEtaComparisonBar(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Live",
+                            text = "Estimate",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
@@ -267,7 +267,7 @@ private fun ProviderCard(
             }
 
             Text(
-                text = "driver pickup",
+                text = "estimated pickup",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontSize = 8.sp,
                     color = Slate400
@@ -282,7 +282,7 @@ private fun ProviderCard(
                 shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
-                    text = "from ₹${comp.startingFare}",
+                    text = "est. ₹${comp.startingFare}",
                     modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Bold,
@@ -297,17 +297,17 @@ private fun ProviderCard(
             // Highlight Badge
             when {
                 comp.isFastest && comp.isCheapest -> {
-                    BadgePill(text = "Best Value", color = Color(0xFF059669))
+                    BadgePill(text = "Est. value", color = Color(0xFF059669))
                 }
                 comp.isFastest -> {
-                    BadgePill(text = "Fastest", color = Color(0xFFD97706))
+                    BadgePill(text = "Est. fastest", color = Color(0xFFD97706))
                 }
                 comp.isCheapest -> {
-                    BadgePill(text = "Cheapest", color = EmeraldSavings)
+                    BadgePill(text = "Lowest estimate", color = EmeraldSavings)
                 }
                 else -> {
                     Text(
-                        text = "${comp.activeFleetCount}+ online",
+                        text = "Availability unverified",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 8.sp,
                             color = Slate400

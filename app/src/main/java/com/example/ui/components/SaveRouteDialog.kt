@@ -118,14 +118,14 @@ fun SaveRouteDialog(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Column {
                                     Text(
-                                        text = "Price Drop Alert",
+                                        text = "Manual Price Target",
                                         style = MaterialTheme.typography.labelMedium.copy(
                                             fontWeight = FontWeight.Bold,
                                             color = if (priceAlertEnabled) EmeraldSavings else Slate700
                                         )
                                     )
                                     Text(
-                                        text = "Notify when fare drops below target",
+                                        text = "Check estimates manually; no background alerts",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontSize = 9.sp,
                                             color = Slate400
@@ -150,7 +150,7 @@ fun SaveRouteDialog(
                         AnimatedVisibility(visible = priceAlertEnabled) {
                             Column(modifier = Modifier.padding(top = 8.dp)) {
                                 Text(
-                                    text = "Alert Threshold: ≤ ₹$priceThreshold",
+                                    text = "Price Target: ≤ ₹$priceThreshold",
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = EmeraldSavings

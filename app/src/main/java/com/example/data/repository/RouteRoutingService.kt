@@ -1,6 +1,8 @@
 package com.example.data.repository
 
 import com.example.data.model.GeoPoint
+import com.example.data.model.validCoordinates
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -31,9 +33,11 @@ object RouteRoutingService {
         dLat: Double,
         dLng: Double
     ): RouteResult = withContext(Dispatchers.IO) {
+        if (!validCoordinates(pLat, pLng) || !validCoordinates(dLat, dLng)) return@withContext RouteResult(emptyList(), null, null)
+        var conn: HttpURLConnection? = null
         try {
             val urlStr = "https://router.project-osrm.org/route/v1/driving/$pLng,$pLat;$dLng,$dLat?overview=full&geometries=geojson"
-            val conn = URL(urlStr).openConnection() as HttpURLConnection
+            conn = URL(urlStr).openConnection() as HttpURLConnection
             conn.connectTimeout = 3500
             conn.readTimeout = 3500
             conn.requestMethod = "GET"
@@ -62,6 +66,7 @@ object RouteRoutingService {
                             val coord = coordinates.getJSONArray(i)
                             val lng = coord.getDouble(0)
                             val lat = coord.getDouble(1)
+                            if (!validCoordinates(lat, lng)) return@withContext RouteResult(emptyList(), null, null)
                             points.add(GeoPoint(lat = lat, lng = lng))
                         }
                         if (points.isNotEmpty()) {
@@ -74,35 +79,19 @@ object RouteRoutingService {
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
-            // Silently fall back to realistic generated road coordinates
+            // Caller displays an unavailable state and an approximate distance.
+        } finally {
+            conn?.disconnect()
         }
 
         RouteResult(
-            points = generateFallbackRoadPoints(pLat, pLng, dLat, dLng),
+            points = emptyList(),
             distanceKm = null,
             durationMinutes = null
         )
     }
 
-    private fun generateFallbackRoadPoints(
-        pLat: Double,
-        pLng: Double,
-        dLat: Double,
-        dLng: Double
-    ): List<GeoPoint> {
-        val dx = dLng - pLng
-        val dy = dLat - pLat
-        val points = mutableListOf<GeoPoint>()
-        val steps = 30
-        for (i in 0..steps) {
-            val t = i.toDouble() / steps.toDouble()
-            val ease = t * t * (3.0 - 2.0 * t)
-            val wobble = Math.sin(t * Math.PI * 2) * 0.008
-            val lat = pLat + dy * ease + wobble
-            val lng = pLng + dx * t
-            points.add(GeoPoint(lat = lat, lng = lng))
-        }
-        return points
-    }
 }
