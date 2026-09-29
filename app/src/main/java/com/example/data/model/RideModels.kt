@@ -82,8 +82,7 @@ data class ProviderComparison(
     val nearestEtaMinutes: Int,
     val startingFare: Int,
     val isFastest: Boolean = false,
-    val isCheapest: Boolean = false,
-    val activeFleetCount: Int = 12
+    val isCheapest: Boolean = false
 )
 
 data class PresetLocation(

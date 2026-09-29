@@ -81,7 +81,7 @@ fun FareBreakdownModal(
             ) {
                 Column {
                     Text(
-                        text = "Fare Breakdown",
+                        text = "Estimated Fare Breakdown",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
@@ -173,7 +173,7 @@ fun FareBreakdownModal(
                         )
                     )
                     Text(
-                        text = "Tolls & parking extra if applicable",
+                        text = "Sample fees and taxes; confirm actual total in the provider app.",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -210,7 +210,7 @@ fun FareBreakdownModal(
                 )
             ) {
                 Text(
-                    text = "Proceed to Book on ${rideOption.provider.displayName}",
+                    text = "Open ${rideOption.provider.displayName} to confirm",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.width(6.dp))

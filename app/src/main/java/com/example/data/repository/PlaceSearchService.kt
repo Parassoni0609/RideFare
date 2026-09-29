@@ -4,6 +4,9 @@ import android.content.Context
 import android.location.Address
 import android.location.Geocoder
 import android.os.Build
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -40,6 +43,7 @@ object PlaceSearchService {
 
         val results = mutableListOf<PlaceSearchResult>()
 
+        var conn: HttpURLConnection? = null
         // 1. Live Photon OpenStreetMap Places Search (Autocomplete search engine)
         try {
             val encodedQuery = URLEncoder.encode(trimmed, "UTF-8")
@@ -49,7 +53,7 @@ object PlaceSearchService {
                 "https://photon.komoot.io/api/?q=$encodedQuery&limit=10"
             }
 
-            val conn = URL(urlString).openConnection() as HttpURLConnection
+            conn = URL(urlString).openConnection() as HttpURLConnection
             conn.connectTimeout = 3500
             conn.readTimeout = 3500
             conn.requestMethod = "GET"
@@ -117,7 +121,13 @@ object PlaceSearchService {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        } finally {
+            conn?.disconnect()
+        }
+        coroutineContext.ensureActive()
 
         // 2. Android Geocoder
         try {

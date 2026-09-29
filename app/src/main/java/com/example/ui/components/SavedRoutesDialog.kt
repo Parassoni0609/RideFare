@@ -130,7 +130,7 @@ fun SavedRoutesDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No saved routes yet.\nTap the bookmark icon to save your regular commutes and set price drop alerts!",
+                                text = "No saved routes yet.\nTap the bookmark icon to save your regular commutes and set manual price targets.",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -346,13 +346,13 @@ private fun SavedRouteCardItem(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = if (route.priceAlertEnabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                                contentDescription = "Price Drop Alert",
+                                contentDescription = "Manual Price Target",
                                 tint = if (route.priceAlertEnabled) EmeraldSavings else Slate400,
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Price Drop Alert",
+                                text = "Manual Price Target",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
@@ -380,7 +380,7 @@ private fun SavedRouteCardItem(
                     AnimatedVisibility(visible = route.priceAlertEnabled) {
                         Column(modifier = Modifier.padding(top = 4.dp)) {
                             Text(
-                                text = "Notify if lowest fare drops below: ₹${route.priceThreshold}",
+                                text = "Manual target: ₹${route.priceThreshold} • no background monitoring",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 10.sp,
                                     color = EmeraldSavings,
@@ -449,7 +449,7 @@ private fun SavedRouteCardItem(
                                         )
                                         Spacer(modifier = Modifier.width(3.dp))
                                         Text(
-                                            text = "Test Notification",
+                                            text = "Check Estimate",
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontWeight = FontWeight.Bold,
                                                 color = EmeraldSavings,

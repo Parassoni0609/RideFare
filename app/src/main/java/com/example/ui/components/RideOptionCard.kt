@@ -109,7 +109,7 @@ fun RideOptionCard(
                             modifier = Modifier.border(1.dp, Color(0xFF10B981), RoundedCornerShape(8.dp))
                         ) {
                             Text(
-                                text = "🏆⚡ BEST VALUE",
+                                text = "🏆⚡ EST. VALUE",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Black,
@@ -126,7 +126,7 @@ fun RideOptionCard(
                             modifier = Modifier.border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(8.dp))
                         ) {
                             Text(
-                                text = "⚡ FASTEST PICKUP",
+                                text = "⚡ LOWEST PICKUP ESTIMATE",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Black,
@@ -143,7 +143,7 @@ fun RideOptionCard(
                             modifier = Modifier.border(1.dp, EmeraldSavings.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                         ) {
                             Text(
-                                text = "CHEAPEST IN ${ride.category.title.uppercase()}",
+                                text = "LOWEST ESTIMATE IN ${ride.category.title.uppercase()}",
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
@@ -171,7 +171,7 @@ fun RideOptionCard(
                                     modifier = Modifier.size(11.dp)
                                 )
                                 Text(
-                                    text = String.format("%.1fx Surge", ride.fareBreakdown.surgeMultiplier),
+                                    text = String.format("%.1fx assumed surge", ride.fareBreakdown.surgeMultiplier),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 9.sp,
@@ -201,7 +201,7 @@ fun RideOptionCard(
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "${ride.etaMinutes} min pickup",
+                            text = "~${ride.etaMinutes} min estimated pickup",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,
@@ -310,7 +310,7 @@ fun RideOptionCard(
                         )
                     }
                     Text(
-                        text = "Total fare",
+                        text = "Estimated fare",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 9.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -343,7 +343,7 @@ fun RideOptionCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Pickup: ${ride.etaMinutes} min",
+                            text = "Est. pickup: ${ride.etaMinutes} min",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp,
@@ -381,7 +381,7 @@ fun RideOptionCard(
                     )
 
                     Text(
-                        text = "Fare: ₹${ride.totalFare}",
+                        text = "Est. ₹${ride.totalFare}",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 11.sp,
@@ -450,7 +450,7 @@ fun RideOptionCard(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Book on ${ride.provider.displayName}",
+                            text = "Open ${ride.provider.displayName}",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp

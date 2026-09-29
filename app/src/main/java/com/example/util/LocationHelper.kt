@@ -1,195 +1,96 @@
 package com.example.util
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
+import kotlin.coroutines.resume
 
 data class UserLocationData(
-    val latitude: Double,
-    val longitude: Double,
-    val addressName: String,
-    val shortName: String,
-    val cityName: String = ""
+    val latitude: Double, val longitude: Double, val addressName: String,
+    val shortName: String, val cityName: String = ""
 )
 
 object LocationHelper {
-
-    fun hasLocationPermission(context: Context): Boolean {
-        val fine = ContextCompat.checkSelfPermission(
-            context,
-            android.Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(
-            context,
-            android.Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        return fine || coarse
-    }
+    fun hasLocationPermission(context: Context): Boolean = listOf(
+        android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION
+    ).any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
 
     fun isGpsEnabled(context: Context): Boolean {
         val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return false
-        return try {
-            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        } catch (_: Exception) {
-            false
-        }
+        return runCatching { lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
     }
 
-    @SuppressLint("MissingPermission")
-    fun fetchCurrentLocation(
-        context: Context,
-        onSuccess: (UserLocationData) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        if (!hasLocationPermission(context)) {
-            onError("Location permission not granted. Please allow location access to use your current location.")
-            return
-        }
-
-        try {
-            val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-            val cts = CancellationTokenSource()
-
-            fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
-                .addOnSuccessListener { location: Location? ->
-                    if (location != null) {
-                        val geocoded = reverseGeocode(context, location.latitude, location.longitude)
-                        onSuccess(
-                            UserLocationData(
-                                latitude = location.latitude,
-                                longitude = location.longitude,
-                                addressName = geocoded.first,
-                                shortName = geocoded.second,
-                                cityName = geocoded.third
-                            )
-                        )
-                    } else {
-                        // Fallback to last known location or system LocationManager
-                        fusedClient.lastLocation.addOnSuccessListener { lastLoc: Location? ->
-                            if (lastLoc != null) {
-                                val geocoded = reverseGeocode(context, lastLoc.latitude, lastLoc.longitude)
-                                onSuccess(
-                                    UserLocationData(
-                                        latitude = lastLoc.latitude,
-                                        longitude = lastLoc.longitude,
-                                        addressName = geocoded.first,
-                                        shortName = geocoded.second,
-                                        cityName = geocoded.third
-                                    )
-                                )
-                            } else {
-                                fallbackToLocationManager(context, onSuccess, onError)
-                            }
-                        }.addOnFailureListener {
-                            fallbackToLocationManager(context, onSuccess, onError)
-                        }
-                    }
-                }
-                .addOnFailureListener {
-                    fallbackToLocationManager(context, onSuccess, onError)
-                }
-        } catch (e: Exception) {
-            fallbackToLocationManager(context, onSuccess, onError)
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun fallbackToLocationManager(
-        context: Context,
-        onSuccess: (UserLocationData) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        try {
-            val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            val providers = lm.getProviders(true)
-            var bestLoc: Location? = null
-
-            for (provider in providers) {
-                val l = lm.getLastKnownLocation(provider) ?: continue
-                if (bestLoc == null || l.accuracy < bestLoc.accuracy) {
-                    bestLoc = l
+    @android.annotation.SuppressLint("MissingPermission")
+    suspend fun currentLocation(context: Context): UserLocationData {
+        check(hasLocationPermission(context)) { "Allow location access or enter a pickup address." }
+        val location = withTimeoutOrNull(15_000) {
+            suspendCancellableCoroutine<Location?> { continuation ->
+                val token = CancellationTokenSource()
+                continuation.invokeOnCancellation { token.cancel() }
+                try {
+                    LocationServices.getFusedLocationProviderClient(context)
+                        .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, token.token)
+                        .addOnSuccessListener { if (continuation.isActive) continuation.resume(it) }
+                        .addOnFailureListener { if (continuation.isActive) continuation.resume(null) }
+                } catch (_: Exception) {
+                    if (continuation.isActive) continuation.resume(null)
                 }
             }
-
-            if (bestLoc != null) {
-                val geocoded = reverseGeocode(context, bestLoc.latitude, bestLoc.longitude)
-                onSuccess(
-                    UserLocationData(
-                        latitude = bestLoc.latitude,
-                        longitude = bestLoc.longitude,
-                        addressName = geocoded.first,
-                        shortName = geocoded.second,
-                        cityName = geocoded.third
-                    )
-                )
-            } else {
-                onError("Could not detect GPS location. Please ensure location is enabled.")
-            }
-        } catch (e: Exception) {
-            onError("Failed to obtain location: ${e.localizedMessage ?: "Unknown error"}")
+        }?.takeIf(::isRecent) ?: withContext(Dispatchers.IO) {
+            val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            manager.getProviders(true).mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
+                .filter(::isRecent).minByOrNull { it.accuracy }
+        } ?: error("Could not obtain a recent location. Enter a pickup address or enable GPS.")
+        // Blocking geocoding always runs on IO; callbacks cannot block Compose's main thread.
+        return withContext(Dispatchers.IO) {
+            val address = reverseGeocode(context, location.latitude, location.longitude)
+            ensureActive()
+            UserLocationData(location.latitude, location.longitude, address.first, address.second, address.third)
         }
     }
 
-    fun reverseGeocode(context: Context, lat: Double, lng: Double): Triple<String, String, String> {
+    private fun isRecent(location: Location): Boolean {
+        val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+        return ageNanos in 0..120_000_000_000L && location.accuracy <= 1000f
+    }
+
+    @Suppress("DEPRECATION")
+    private fun reverseGeocode(context: Context, lat: Double, lng: Double): Triple<String, String, String> {
         try {
+            val address = Geocoder(context, Locale.getDefault()).getFromLocation(lat, lng, 1)?.firstOrNull()
+            if (address != null) {
+                val short = address.subLocality ?: address.locality ?: address.featureName ?: "Current Location"
+                val city = address.locality ?: address.subAdminArea ?: ""
+                val full = listOfNotNull(address.thoroughfare, address.subLocality, address.locality, address.postalCode)
+                    .filter { it.isNotBlank() }.joinToString(", ")
+                return Triple(full.ifBlank { short }, short, city)
+            }
+        } catch (_: Exception) { }
+        return Triple(String.format(Locale.US, "GPS %.5f, %.5f", lat, lng), "Current Location", "")
+    }
+
+    @Suppress("DEPRECATION")
+    suspend fun forwardGeocode(context: Context, locationName: String, cityHint: String? = null): Pair<Double, Double>? =
+        withContext(Dispatchers.IO) {
+            if (locationName.isBlank()) return@withContext null
             val geocoder = Geocoder(context, Locale.getDefault())
-            val addresses = geocoder.getFromLocation(lat, lng, 1)
-            if (!addresses.isNullOrEmpty()) {
-                val addr = addresses[0]
-                val subLocality = addr.subLocality ?: addr.locality ?: addr.featureName ?: "Current Location"
-                val city = addr.locality ?: addr.subAdminArea ?: addr.adminArea ?: ""
-                val full = listOfNotNull(
-                    addr.thoroughfare,
-                    addr.subLocality,
-                    addr.locality,
-                    addr.postalCode
-                ).filter { it.isNotBlank() }.joinToString(", ")
-
-                val readable = if (full.isNotBlank()) full else "$subLocality, $city"
-                return Triple(readable, subLocality, city)
-            }
-        } catch (_: Exception) {
-            // Geocoder fallback
+            val query = if (!cityHint.isNullOrBlank() && !locationName.contains(cityHint, true)) "$locationName, $cityHint" else locationName
+            val result = runCatching { geocoder.getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
+            ensureActive()
+            result?.let { Pair(it.latitude, it.longitude) }
         }
-        val formattedCoords = String.format(Locale.US, "%.4f, %.4f", lat, lng)
-        return Triple("Current GPS ($formattedCoords)", "Current Location", "")
-    }
-
-    suspend fun forwardGeocode(
-        context: Context,
-        locationName: String,
-        cityHint: String? = null
-    ): Pair<Double, Double>? = withContext(Dispatchers.IO) {
-        if (locationName.isBlank()) return@withContext null
-        try {
-            val geocoder = Geocoder(context, Locale.getDefault())
-            val query = if (!cityHint.isNullOrBlank() && !locationName.contains(cityHint, ignoreCase = true)) {
-                "$locationName, $cityHint"
-            } else {
-                locationName
-            }
-            var addresses = geocoder.getFromLocationName(query, 1)
-            if (addresses.isNullOrEmpty() && query != locationName) {
-                addresses = geocoder.getFromLocationName(locationName, 1)
-            }
-            if (!addresses.isNullOrEmpty()) {
-                val addr = addresses[0]
-                return@withContext Pair(addr.latitude, addr.longitude)
-            }
-        } catch (_: Exception) {
-            // Geocoder network failure
-        }
-        null
-    }
 }

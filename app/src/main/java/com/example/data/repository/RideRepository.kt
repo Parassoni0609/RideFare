@@ -40,14 +40,23 @@ class RideRepository(private val rideDao: RideDao) {
         )
     }
 
+    suspend fun getSavedRoute(id: Long): SavedRoute? = rideDao.getSavedRoute(id)
+
     suspend fun saveRoute(
         title: String,
         pickup: String,
         drop: String,
         distanceKm: Float,
         priceAlertEnabled: Boolean = false,
-        priceThreshold: Int = 250
-    ) {
+        priceThreshold: Int = 250,
+        pickupLat: Double? = null,
+        pickupLng: Double? = null,
+        dropLat: Double? = null,
+        dropLng: Double? = null,
+        cityId: String = "",
+        traffic: TrafficCondition = TrafficCondition.NORMAL,
+        weather: WeatherOrTimeCondition = WeatherOrTimeCondition.REGULAR
+    ): Long {
         val route = SavedRoute(
             title = title,
             pickupName = pickup,
@@ -55,9 +64,16 @@ class RideRepository(private val rideDao: RideDao) {
             distanceKm = distanceKm,
             isFavorite = true,
             priceAlertEnabled = priceAlertEnabled,
-            priceThreshold = priceThreshold
+            priceThreshold = priceThreshold.coerceAtLeast(1),
+            pickupLat = pickupLat,
+            pickupLng = pickupLng,
+            dropLat = dropLat,
+            dropLng = dropLng,
+            cityId = cityId,
+            trafficCondition = traffic.name,
+            weatherCondition = weather.name
         )
-        rideDao.insertSavedRoute(route)
+        return rideDao.insertSavedRoute(route)
     }
 
     suspend fun updatePriceAlert(routeId: Long, enabled: Boolean, threshold: Int) {

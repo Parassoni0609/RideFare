@@ -1,0 +1,186 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "95412619f12e7ada9e07f1ec5e5cff97",
+    "entities": [
+      {
+        "tableName": "saved_routes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `pickupName` TEXT NOT NULL, `dropName` TEXT NOT NULL, `distanceKm` REAL NOT NULL, `isFavorite` INTEGER NOT NULL, `priceAlertEnabled` INTEGER NOT NULL, `priceThreshold` INTEGER NOT NULL, `pickupLat` REAL, `pickupLng` REAL, `dropLat` REAL, `dropLng` REAL, `cityId` TEXT NOT NULL DEFAULT '', `trafficCondition` TEXT NOT NULL DEFAULT 'NORMAL', `weatherCondition` TEXT NOT NULL DEFAULT 'REGULAR', `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pickupName",
+            "columnName": "pickupName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dropName",
+            "columnName": "dropName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceKm",
+            "columnName": "distanceKm",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isFavorite",
+            "columnName": "isFavorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceAlertEnabled",
+            "columnName": "priceAlertEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priceThreshold",
+            "columnName": "priceThreshold",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pickupLat",
+            "columnName": "pickupLat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "pickupLng",
+            "columnName": "pickupLng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "dropLat",
+            "columnName": "dropLat",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "dropLng",
+            "columnName": "dropLng",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "cityId",
+            "columnName": "cityId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "trafficCondition",
+            "columnName": "trafficCondition",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'NORMAL'"
+          },
+          {
+            "fieldPath": "weatherCondition",
+            "columnName": "weatherCondition",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'REGULAR'"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "search_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `pickupName` TEXT NOT NULL, `dropName` TEXT NOT NULL, `distanceKm` REAL NOT NULL, `cheapestProvider` TEXT NOT NULL, `cheapestService` TEXT NOT NULL, `cheapestFare` INTEGER NOT NULL, `maxFare` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pickupName",
+            "columnName": "pickupName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dropName",
+            "columnName": "dropName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "distanceKm",
+            "columnName": "distanceKm",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cheapestProvider",
+            "columnName": "cheapestProvider",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cheapestService",
+            "columnName": "cheapestService",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cheapestFare",
+            "columnName": "cheapestFare",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxFare",
+            "columnName": "maxFare",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '95412619f12e7ada9e07f1ec5e5cff97')"
+    ]
+  }
+}

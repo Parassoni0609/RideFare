@@ -52,9 +52,11 @@ object FareCalculator {
                 platformFee = 3,
                 providerSurgeBonus = 1.0f,
                 weatherSurge = if (weather == WeatherOrTimeCondition.RAIN) 1.6f else weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 2,
                 capacity = "1 Person",
-                featureHighlight = "Beats city traffic • Helmet provided"
+                featureHighlight = "Bike estimate • confirm safety equipment"
             )
         )
 
@@ -76,6 +78,8 @@ object FareCalculator {
                 platformFee = 4,
                 providerSurgeBonus = 1.05f,
                 weatherSurge = if (weather == WeatherOrTimeCondition.RAIN) 1.55f else weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 3,
                 capacity = "1 Person",
                 featureHighlight = "Affordable two-wheeler ride"
@@ -100,6 +104,8 @@ object FareCalculator {
                 platformFee = 4,
                 providerSurgeBonus = 1.02f,
                 weatherSurge = if (weather == WeatherOrTimeCondition.RAIN) 1.58f else weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 4,
                 capacity = "1 Person",
                 featureHighlight = "Quick daily commute"
@@ -124,9 +130,11 @@ object FareCalculator {
                 platformFee = 5,
                 providerSurgeBonus = 1.0f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 3,
                 capacity = "3 Persons",
-                featureHighlight = "Meter-free guaranteed rates"
+                featureHighlight = "Auto estimate • confirm actual fare"
             )
         )
 
@@ -148,6 +156,8 @@ object FareCalculator {
                 platformFee = 6,
                 providerSurgeBonus = 1.04f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 4,
                 capacity = "3 Persons",
                 featureHighlight = "Doorstep auto pickup • Cashless"
@@ -172,9 +182,11 @@ object FareCalculator {
                 platformFee = 5,
                 providerSurgeBonus = 1.02f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 3,
                 capacity = "3 Persons",
-                featureHighlight = "Reliable auto with verified drivers"
+                featureHighlight = "Auto estimate • availability unverified"
             )
         )
 
@@ -196,6 +208,8 @@ object FareCalculator {
                 platformFee = 18,
                 providerSurgeBonus = 1.03f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 3,
                 capacity = "4 Persons",
                 featureHighlight = "Affordable, compact AC hatchback"
@@ -220,6 +234,8 @@ object FareCalculator {
                 platformFee = 19,
                 providerSurgeBonus = 1.05f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 4,
                 capacity = "4 Persons",
                 featureHighlight = "Comfortable everyday city hatchback"
@@ -244,9 +260,11 @@ object FareCalculator {
                 platformFee = 15,
                 providerSurgeBonus = 1.0f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 5,
                 capacity = "4 Persons",
-                featureHighlight = "Lowest commission cab guarantee"
+                featureHighlight = "Economy cab estimate"
             )
         )
 
@@ -268,9 +286,11 @@ object FareCalculator {
                 platformFee = 25,
                 providerSurgeBonus = 1.02f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 5,
                 capacity = "4 Persons",
-                featureHighlight = "Premium sedans with top rated drivers"
+                featureHighlight = "Premium cab estimate • confirm features"
             )
         )
 
@@ -292,9 +312,11 @@ object FareCalculator {
                 platformFee = 25,
                 providerSurgeBonus = 1.04f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 6,
                 capacity = "4 Persons",
-                featureHighlight = "Extra legroom, free in-cab WiFi"
+                featureHighlight = "Sedan estimate • confirm features"
             )
         )
 
@@ -316,6 +338,8 @@ object FareCalculator {
                 platformFee = 30,
                 providerSurgeBonus = 1.05f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 7,
                 capacity = "6 Persons",
                 featureHighlight = "Spacious 6-seater SUV for luggage"
@@ -340,6 +364,8 @@ object FareCalculator {
                 platformFee = 32,
                 providerSurgeBonus = 1.06f,
                 weatherSurge = weather.surgeMultiplier,
+                traffic = traffic,
+                weather = weather,
                 etaMinutes = 8,
                 capacity = "6 Persons",
                 featureHighlight = "Ertiga/Innova with ample luggage room"
@@ -389,12 +415,7 @@ object FareCalculator {
             com.example.data.model.ProviderComparison(
                 provider = p,
                 nearestEtaMinutes = nearestEta,
-                startingFare = lowestFare,
-                activeFleetCount = when (p) {
-                    RideProvider.RAPIDO -> 18
-                    RideProvider.UBER -> 24
-                    RideProvider.OLA -> 20
-                }
+                startingFare = lowestFare
             )
         }
 
@@ -483,16 +504,8 @@ object FareCalculator {
                 val wl = "https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=$encodedDrop"
                 dl to wl
             }
-            RideProvider.OLA -> {
-                val dl = "ola://ola/rides?action=request&drop_name=$encodedDrop&pickup_name=$encodedPickup"
-                val wl = "https://book.olacabs.com/?pickup_name=$encodedPickup&drop_name=$encodedDrop"
-                dl to wl
-            }
-            RideProvider.RAPIDO -> {
-                val dl = "rapido://booking?pickup=$encodedPickup&drop=$encodedDrop"
-                val wl = "https://www.rapido.bike"
-                dl to wl
-            }
+            RideProvider.OLA -> "" to RideProvider.OLA.websiteUrl
+            RideProvider.RAPIDO -> "" to RideProvider.RAPIDO.websiteUrl
         }
 
         return RideOption(

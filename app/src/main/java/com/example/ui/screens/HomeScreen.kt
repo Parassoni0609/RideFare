@@ -83,14 +83,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var isSaveDialogVisible by remember { mutableStateOf(false) }
 
-    fun fetchLocation() {
-        viewModel.setLocatingUser(true)
-        LocationHelper.fetchCurrentLocation(
-            context = context,
-            onSuccess = { loc -> viewModel.onCurrentLocationSuccess(loc) },
-            onError = { err -> viewModel.onLocationError(err) }
-        )
-    }
+    fun fetchLocation() { viewModel.fetchCurrentLocation(context) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -104,32 +97,12 @@ fun HomeScreen(
         }
     }
 
+    var pendingCheck by remember { mutableStateOf<com.example.data.local.SavedRoute?>(null) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Toast.makeText(context, "Price drop notifications enabled!", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (!com.example.util.PriceAlertNotificationHelper.hasNotificationPermission(context)) {
-                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        // Auto-detect GPS location on startup
-        if (LocationHelper.hasLocationPermission(context)) {
-            fetchLocation()
-        } else {
-            // Automatically prompt for location permission on start so GPS location is automatically fetched
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        }
+    ) { _ ->
+        pendingCheck?.let { viewModel.checkPriceTarget(it, context) }
+        pendingCheck = null
     }
 
     fun requestLocationAndFetch() {
@@ -185,7 +158,10 @@ fun HomeScreen(
                     isCurrentLocationActive = uiState.isCurrentLocationActive,
                     isLocatingUser = uiState.isLocatingUser,
                     onUseCurrentLocationClick = { requestLocationAndFetch() },
-                    onSwapClick = { viewModel.swapLocations() }
+                    onSwapClick = { viewModel.swapLocations() },
+                    routePoints = uiState.routePoints,
+                    isRouting = uiState.isRouting,
+                    routeUnavailable = uiState.routeUnavailable
                 )
             }
 
@@ -216,59 +192,14 @@ fun HomeScreen(
                 )
             }
 
-            if (uiState.isNoRideAppAvailable) {
-                item(key = "no_service_banner") {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = com.example.ui.theme.RoseError.copy(alpha = 0.1f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = com.example.ui.theme.RoseError.copy(alpha = 0.15f),
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.SearchOff,
-                                        contentDescription = null,
-                                        tint = com.example.ui.theme.RoseError,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "No Ride Services in ${uiState.unavailableCityName.ifBlank { "This Area" }}",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = com.example.ui.theme.RoseError
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "Ola, Uber, and Rapido are currently not operational in this region. Tap to select a supported city.",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 12.sp
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if (uiState.dropText.isBlank()) {
+            item(key = "estimate_and_privacy_notice") {
+                Text(
+                    text = "Fares and pickup times use sample rates and assumptions, not live quotes. Confirm price, vehicle and availability in the provider app.\n\nSearch sends your query and location to Photon and Android's geocoder; routing sends endpoint coordinates to OSRM. Favorites and history are stored on this device. No background price monitoring.",
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (!uiState.hasResolvedEndpoints) {
                 item(key = "enter_destination_prompt") {
                     Card(
                         modifier = Modifier
@@ -302,7 +233,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(14.dp))
                             Column {
                                 Text(
-                                    text = "Enter Destination",
+                                    text = "Select Pickup and Destination",
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -310,7 +241,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Enter where you want to go to compare live fares across Uber, Ola, and Rapido.",
+                                    text = "Select search results for both addresses to compare estimated fares across Uber, Ola, and Rapido.",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 12.sp
@@ -350,7 +281,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Checking live rates across Ola, Uber, Rapido...",
+                                    text = "Calculating fare estimates...",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -372,7 +303,6 @@ fun HomeScreen(
                                     option = cheapest,
                                     pickup = uiState.pickupText,
                                     drop = uiState.dropText,
-                                    isCurrentLocation = uiState.isCurrentLocationActive,
                                     pickupLat = uiState.pickupLat,
                                     pickupLng = uiState.pickupLng,
                                     dropLat = uiState.dropLat,
@@ -407,7 +337,7 @@ fun HomeScreen(
                             comparisons = uiState.providerComparisons,
                             selectedProvider = uiState.selectedProviderFilter,
                             onSelectProvider = { viewModel.onProviderFilterToggle(it) },
-                            onRefreshEtas = { viewModel.refreshLiveEtas() }
+                            onRefreshEtas = { viewModel.refreshEstimates() }
                         )
                     }
                 }
@@ -478,7 +408,6 @@ fun HomeScreen(
                                 option = ride,
                                 pickup = uiState.pickupText,
                                 drop = uiState.dropText,
-                                isCurrentLocation = uiState.isCurrentLocationActive,
                                 pickupLat = uiState.pickupLat,
                                 pickupLng = uiState.pickupLng,
                                 dropLat = uiState.dropLat,
@@ -513,79 +442,12 @@ fun HomeScreen(
                     option = ride,
                     pickup = uiState.pickupText,
                     drop = uiState.dropText,
-                    isCurrentLocation = uiState.isCurrentLocationActive,
                     pickupLat = uiState.pickupLat,
                     pickupLng = uiState.pickupLng,
                     dropLat = uiState.dropLat,
                     dropLng = uiState.dropLng
                 )
             }
-        )
-    }
-
-    // Modal: No Ride App Available in City Alert Dialog
-    if (uiState.isNoRideAppAvailable) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { viewModel.dismissNoRideAppDialog() },
-            icon = {
-                androidx.compose.material3.Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.SearchOff,
-                    contentDescription = null,
-                    tint = com.example.ui.theme.RoseError,
-                    modifier = Modifier.size(36.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "No Ride Services Available",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (uiState.unavailableMessage.isNotBlank()) {
-                            uiState.unavailableMessage
-                        } else {
-                            "Ola, Uber, and Rapido are currently not operational in ${uiState.unavailableCityName.ifBlank { "this region" }}. Ride-hailing apps do not provide services here."
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Tip: You can select a nearby metropolitan city to compare rates.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = ElectricBluePrimary,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            },
-            confirmButton = {
-                androidx.compose.material3.Button(
-                    onClick = {
-                        viewModel.dismissNoRideAppDialog()
-                        viewModel.setCityDialogVisible(true)
-                    },
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = ElectricBluePrimary
-                    )
-                ) {
-                    Text("Choose Another City")
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(
-                    onClick = { viewModel.dismissNoRideAppDialog() }
-                ) {
-                    Text("Got It")
-                }
-            },
-            shape = RoundedCornerShape(20.dp)
         )
     }
 
@@ -606,18 +468,16 @@ fun HomeScreen(
             onSelectRoute = { viewModel.applySavedRoute(it) },
             onDeleteRoute = { viewModel.deleteSavedRoute(it) },
             onTogglePriceAlert = { route, enabled, threshold ->
-                if (enabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-                    !com.example.util.PriceAlertNotificationHelper.hasNotificationPermission(context)) {
-                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                }
-                viewModel.updatePriceAlert(route.id, enabled, threshold, context)
+                viewModel.updatePriceAlert(route.id, enabled, threshold)
             },
             onTestPriceAlert = { route ->
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                if (android.os.Build.VERSION.SDK_INT >= 33 &&
                     !com.example.util.PriceAlertNotificationHelper.hasNotificationPermission(context)) {
+                    pendingCheck = route
                     notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    viewModel.checkPriceTarget(route, context)
                 }
-                viewModel.testPriceAlert(route, context)
             },
             onClearHistory = { viewModel.clearHistory() },
             onDismiss = { viewModel.setSavedRoutesDialogVisible(false) }
@@ -630,11 +490,7 @@ fun HomeScreen(
             pickup = uiState.pickupText,
             drop = uiState.dropText,
             onSave = { title, priceAlertEnabled, priceThreshold ->
-                if (priceAlertEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-                    !com.example.util.PriceAlertNotificationHelper.hasNotificationPermission(context)) {
-                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                }
-                viewModel.saveCurrentRoute(title, priceAlertEnabled, priceThreshold, context)
+                viewModel.saveCurrentRoute(title, priceAlertEnabled, priceThreshold)
                 isSaveDialogVisible = false
             },
             onDismiss = { isSaveDialogVisible = false }
