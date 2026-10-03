@@ -52,6 +52,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.RideOption
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.ui.components.ProviderPriceCard
+import com.example.data.model.RideProvider
+import com.example.BuildConfig
 import com.example.ui.components.CategoryAndSortRow
 import com.example.ui.components.CheapestDealHeroCard
 import com.example.ui.components.CitySelectorDialog
@@ -97,14 +100,6 @@ fun HomeScreen(
         }
     }
 
-    var pendingCheck by remember { mutableStateOf<com.example.data.local.SavedRoute?>(null) }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        pendingCheck?.let { viewModel.checkPriceTarget(it, context) }
-        pendingCheck = null
-    }
-
     fun requestLocationAndFetch() {
         if (LocationHelper.hasLocationPermission(context)) {
             fetchLocation()
@@ -133,7 +128,7 @@ fun HomeScreen(
                 selectedCity = uiState.selectedCity,
                 onCityClick = { viewModel.setCityDialogVisible(true) },
                 onSavedRoutesClick = { viewModel.setSavedRoutesDialogVisible(true) },
-                onRefreshClick = { viewModel.recalculateFares(isUserInitiated = true) }
+                onRefreshClick = { viewModel.refreshEstimates() }
             )
         }
     ) { innerPadding ->
@@ -144,27 +139,6 @@ fun HomeScreen(
                 .testTag("home_screen_scroll"),
             contentPadding = PaddingValues(bottom = 32.dp)
         ) {
-            // Interactive Route Map & GPS Locator Card
-            item(key = "route_map") {
-                RouteMapCard(
-                    pickupName = uiState.pickupText,
-                    dropName = uiState.dropText,
-                    pickupLat = uiState.pickupLat,
-                    pickupLng = uiState.pickupLng,
-                    dropLat = uiState.dropLat,
-                    dropLng = uiState.dropLng,
-                    distanceKm = uiState.distanceKm,
-                    durationMins = uiState.cheapestOverall?.tripDurationMinutes ?: ((uiState.distanceKm / 20f * 60).toInt()),
-                    isCurrentLocationActive = uiState.isCurrentLocationActive,
-                    isLocatingUser = uiState.isLocatingUser,
-                    onUseCurrentLocationClick = { requestLocationAndFetch() },
-                    onSwapClick = { viewModel.swapLocations() },
-                    routePoints = uiState.routePoints,
-                    isRouting = uiState.isRouting,
-                    routeUnavailable = uiState.routeUnavailable
-                )
-            }
-
             // Location Inputs (Pickup & Drop)
             item(key = "location_inputs") {
                 LocationInputSection(
@@ -194,7 +168,9 @@ fun HomeScreen(
 
             item(key = "estimate_and_privacy_notice") {
                 Text(
-                    text = "Fares and pickup times use sample rates and assumptions, not live quotes. Confirm price, vehicle and availability in the provider app.\n\nSearch sends your query and location to Photon and Android's geocoder; routing sends endpoint coordinates to OSRM. Favorites and history are stored on this device. No background price monitoring.",
+                    text = "Live provider prices are not connected. Check each provider app for the current quote; RideFare does not rank providers using sample rates.\n\n" +
+                        (if (BuildConfig.GOOGLE_PLACES_API_KEY.isNotBlank()) "Place search sends queries and search-area coordinates to Google." else "Limited search uses Photon and Android's geocoder.") +
+                        " Routing sends endpoint coordinates to OSRM. Favorites are stored on this device. No background price monitoring.",
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -241,7 +217,7 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Select search results for both addresses to compare estimated fares across Uber, Ola, and Rapido.",
+                                    text = "Select a result for both addresses, then open a provider to check its current price.",
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 12.sp
@@ -252,203 +228,15 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // Trip Distance & Traffic/Weather Surge Toggles
-                item(key = "trip_metrics") {
-                    TripMetricsSection(
-                        distanceKm = uiState.distanceKm,
-                        traffic = uiState.trafficCondition,
-                        weather = uiState.weatherCondition,
-                        onDistanceChange = { viewModel.onDistanceChange(it) },
-                        onTrafficChange = { viewModel.onTrafficChange(it) },
-                        onWeatherChange = { viewModel.onWeatherChange(it) }
-                    )
-                }
-
-                // Comparison Calculating Indicator
-                if (uiState.isComparing) {
-                    item(key = "comparing_indicator") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = ElectricBluePrimary
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Calculating fare estimates...",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
-                        }
+                items(RideProvider.entries.toList(), key = { it.name }) { provider ->
+                    ProviderPriceCard(provider) {
+                        IntentHelper.openProvider(context, provider, uiState.pickupText, uiState.dropText,
+                            uiState.pickupLat, uiState.pickupLng, uiState.dropLat, uiState.dropLng)
                     }
                 }
 
-                // Hero Highlight: Cheapest Overall Deal
-                uiState.cheapestOverall?.let { cheapest ->
-                    item(key = "cheapest_hero_deal") {
-                        CheapestDealHeroCard(
-                            cheapestRide = cheapest,
-                            onBookClick = {
-                                IntentHelper.bookRide(
-                                    context = context,
-                                    option = cheapest,
-                                    pickup = uiState.pickupText,
-                                    drop = uiState.dropText,
-                                    pickupLat = uiState.pickupLat,
-                                    pickupLng = uiState.pickupLng,
-                                    dropLat = uiState.dropLat,
-                                    dropLng = uiState.dropLng
-                                )
-                            },
-                            onBreakdownClick = { viewModel.showBreakdown(cheapest) },
-                            onCopyLinkClick = {
-                                IntentHelper.copyBookingDetails(
-                                    context = context,
-                                    option = cheapest,
-                                    pickup = uiState.pickupText,
-                                    drop = uiState.dropText
-                                )
-                            },
-                            onShareClick = {
-                                IntentHelper.shareComparison(
-                                    context = context,
-                                    pickup = uiState.pickupText,
-                                    drop = uiState.dropText,
-                                    cheapest = cheapest
-                                )
-                            }
-                        )
-                    }
-                }
-
-                // Live Provider Driver Arrival ETA & Starting Cost Comparison
-                if (uiState.providerComparisons.isNotEmpty()) {
-                    item(key = "provider_eta_comparison") {
-                        ProviderEtaComparisonBar(
-                            comparisons = uiState.providerComparisons,
-                            selectedProvider = uiState.selectedProviderFilter,
-                            onSelectProvider = { viewModel.onProviderFilterToggle(it) },
-                            onRefreshEtas = { viewModel.refreshEstimates() }
-                        )
-                    }
-                }
-
-                // Category Tabs and Sort Row
-                item(key = "category_and_sort") {
-                    Column(modifier = Modifier.padding(top = 8.dp)) {
-                        Text(
-                            text = "COMPARE ALL OPTIONS (${uiState.filteredRideOptions.size})",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 0.5.sp
-                            ),
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-                        )
-                        CategoryAndSortRow(
-                            selectedCategory = uiState.selectedCategory,
-                            selectedProvider = uiState.selectedProviderFilter,
-                            selectedSort = uiState.sortOrder,
-                            onCategorySelect = { viewModel.onCategorySelect(it) },
-                            onProviderToggle = { viewModel.onProviderFilterToggle(it) },
-                            onSortSelect = { viewModel.onSortOrderSelect(it) }
-                        )
-                    }
-                }
-
-                // Empty state if filters exclude all
-                if (uiState.filteredRideOptions.isEmpty()) {
-                    item(key = "empty_state") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(40.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.SearchOff,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "No rides matching current filter",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // List of Ride Options
-                items(
-                    items = uiState.filteredRideOptions,
-                    key = { it.id }
-                ) { ride ->
-                    RideOptionCard(
-                        ride = ride,
-                        onBookClick = {
-                            IntentHelper.bookRide(
-                                context = context,
-                                option = ride,
-                                pickup = uiState.pickupText,
-                                drop = uiState.dropText,
-                                pickupLat = uiState.pickupLat,
-                                pickupLng = uiState.pickupLng,
-                                dropLat = uiState.dropLat,
-                                dropLng = uiState.dropLng
-                            )
-                        },
-                        onBreakdownClick = { viewModel.showBreakdown(ride) },
-                        onCopyLinkClick = {
-                            IntentHelper.copyBookingDetails(
-                                context = context,
-                                option = ride,
-                                pickup = uiState.pickupText,
-                                drop = uiState.dropText
-                            )
-                        }
-                    )
-                }
             }
         }
-    }
-
-    // Modal: Detailed Fare Breakdown
-    uiState.selectedRideForBreakdown?.let { ride ->
-        FareBreakdownModal(
-            rideOption = ride,
-            pickup = uiState.pickupText,
-            drop = uiState.dropText,
-            onDismiss = { viewModel.showBreakdown(null) },
-            onBookClick = {
-                IntentHelper.bookRide(
-                    context = context,
-                    option = ride,
-                    pickup = uiState.pickupText,
-                    drop = uiState.dropText,
-                    pickupLat = uiState.pickupLat,
-                    pickupLng = uiState.pickupLng,
-                    dropLat = uiState.dropLat,
-                    dropLng = uiState.dropLng
-                )
-            }
-        )
     }
 
     // Modal: City Selector Dialog
@@ -470,15 +258,7 @@ fun HomeScreen(
             onTogglePriceAlert = { route, enabled, threshold ->
                 viewModel.updatePriceAlert(route.id, enabled, threshold)
             },
-            onTestPriceAlert = { route ->
-                if (android.os.Build.VERSION.SDK_INT >= 33 &&
-                    !com.example.util.PriceAlertNotificationHelper.hasNotificationPermission(context)) {
-                    pendingCheck = route
-                    notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    viewModel.checkPriceTarget(route, context)
-                }
-            },
+            onTestPriceAlert = { route -> viewModel.checkPriceTarget(route, context) },
             onClearHistory = { viewModel.clearHistory() },
             onDismiss = { viewModel.setSavedRoutesDialogVisible(false) }
         )

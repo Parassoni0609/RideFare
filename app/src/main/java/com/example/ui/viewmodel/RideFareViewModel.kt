@@ -112,9 +112,8 @@ class RideFareViewModel(
                 isCurrentLocationActive = false)
         }
         updateDistanceAndRecalculate()
-        if (preset == null && text.trim().length >= 3 && context != null) {
-            triggerForwardGeocode(context.applicationContext, text, isDrop)
-        }
+        // Typing is not selection. Only a chosen result, GPS, or an explicit
+        // legacy-route resolution may set coordinates. Never silently accept a first match.
     }
 
     private fun findPresetLocation(name: String): PresetLocation? =
@@ -198,7 +197,10 @@ class RideFareViewModel(
     fun selectLocation(preset: PresetLocation, isDrop: Boolean) =
         selectPlaceResult(PlaceSearchResult(preset.name, "", preset.lat, preset.lng, preset.category), isDrop)
 
-    fun selectCustomLocation(text: String, isDrop: Boolean, context: Context? = null) = changeEndpoint(text, isDrop, context)
+    fun selectCustomLocation(text: String, isDrop: Boolean, context: Context? = null) {
+        changeEndpoint(text, isDrop, null)
+        if (context != null && text.trim().length >= 3) triggerForwardGeocode(context.applicationContext, text, isDrop)
+    }
 
     private fun cancelAllEndpointWork() {
         pickupGeocodeJob?.cancel(); dropGeocodeJob?.cancel(); locationJob?.cancel(); restoreJob?.cancel()
@@ -321,34 +323,27 @@ class RideFareViewModel(
         }
         viewModelScope.launch {
             repository.saveRoute(title.ifBlank { "${s.pickupText.take(15)} ➔ ${s.dropText.take(15)}" },
-                s.pickupText, s.dropText, s.distanceKm, priceAlertEnabled, priceThreshold,
+                s.pickupText, s.dropText, s.distanceKm, false, priceThreshold,
                 s.pickupLat, s.pickupLng, s.dropLat, s.dropLng, s.selectedCity.id, s.trafficCondition, s.weatherCondition)
             _uiState.update { it.copy(notificationMessage = if (priceAlertEnabled)
-                "Route and price target saved. Use Check estimate in Favorites; no background monitoring."
+                "Route saved. Price targets are unavailable without live provider prices."
                 else "Route saved to Favorites.") }
         }
     }
 
     fun updatePriceAlert(routeId: Long, enabled: Boolean, threshold: Int) {
-        viewModelScope.launch {
-            repository.updatePriceAlert(routeId, enabled, threshold.coerceAtLeast(1))
-            _uiState.update { it.copy(notificationMessage = if (enabled)
-                "Price target saved for manual checks. No background monitoring."
-                else "Price target disabled.") }
+        if (enabled) {
+            _uiState.update { it.copy(notificationMessage = "Price targets are unavailable without live provider prices.") }
+            return
         }
+        viewModelScope.launch { repository.updatePriceAlert(routeId, false, threshold.coerceAtLeast(1)) }
     }
 
     fun checkPriceTarget(saved: SavedRoute, context: Context) {
-        val traffic = TrafficCondition.entries.firstOrNull { it.name == saved.trafficCondition } ?: TrafficCondition.NORMAL
-        val weather = WeatherOrTimeCondition.entries.firstOrNull { it.name == saved.weatherCondition } ?: WeatherOrTimeCondition.REGULAR
-        val cheapest = repository.compareRides(saved.pickupName, saved.dropName, saved.distanceKm, traffic, weather)
-            .minByOrNull { it.totalFare } ?: return
-        val meets = cheapest.totalFare <= saved.priceThreshold
-        val sent = PriceAlertNotificationHelper.sendEstimateCheck(context, saved, cheapest)
         _uiState.update { it.copy(notificationMessage =
-            "Estimated ₹${cheapest.totalFare}: ${if (meets) "within" else "above"} your ₹${saved.priceThreshold} target. " +
-                "Confirm in ${cheapest.provider.displayName}.${if (sent) " Notification sent." else " Notifications are off."}") }
+            "Live prices are unavailable. Open the provider app to check your saved target.") }
     }
+
     fun deleteSavedRoute(route: SavedRoute) { viewModelScope.launch { repository.deleteRoute(route) } }
     fun clearHistory() { viewModelScope.launch { repository.clearHistory() } }
     fun clearNotification() { _uiState.update { it.copy(notificationMessage = null) } }
@@ -370,7 +365,7 @@ class RideFareViewModel(
     }
     fun refreshEstimates() {
         recalculateFares(false)
-        _uiState.update { it.copy(notificationMessage = "Estimates recalculated. Live fares and driver availability are not available.") }
+        _uiState.update { it.copy(notificationMessage = "Live prices are unavailable. Check prices in each provider app.") }
     }
     private fun filterAndSortCurrentRides() {
         val s = _uiState.value

@@ -180,7 +180,7 @@ fun RideHeaderBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh Rates",
+                        contentDescription = "Check price availability",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )

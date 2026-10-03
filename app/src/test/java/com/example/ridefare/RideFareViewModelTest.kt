@@ -41,7 +41,8 @@ class RideFareViewModelTest {
 
     @Test fun `editing either endpoint immediately invalidates estimates and old coordinates`() = runTest(dispatcher) {
         val vm = model(); resolve(vm); runCurrent()
-        assertTrue(vm.uiState.value.allRideOptions.isNotEmpty())
+        assertTrue(vm.uiState.value.hasResolvedEndpoints)
+        assertTrue(vm.uiState.value.allRideOptions.isEmpty())
         vm.onDropChange("Unresolved destination")
         assertNull(vm.uiState.value.dropLat)
         assertEquals(0f, vm.uiState.value.distanceKm)
@@ -78,6 +79,7 @@ class RideFareViewModelTest {
         assertEquals(13.0, saved.dropLat!!, 0.0)
         assertEquals("JAMMED", saved.trafficCondition)
         assertEquals(200, saved.priceThreshold)
+        assertFalse(saved.priceAlertEnabled)
     }
 
     @Test fun `pickup and drop geocoding run independently and selection cancels outdated work`() = runTest(dispatcher) {
@@ -86,12 +88,12 @@ class RideFareViewModelTest {
             calls.add(query); delay(100)
             if (query.startsWith("Pickup")) Pair(12.9, 77.6) else Pair(13.0, 77.7)
         }, route = { _, _, _, _ -> RouteResult(emptyList(), null, null) })
-        vm.onPickupChange("Pickup query", context)
-        vm.onDropChange("Drop query", context)
+        vm.selectCustomLocation("Pickup query", false, context)
+        vm.selectCustomLocation("Drop query", true, context)
         advanceUntilIdle()
         assertEquals(setOf("Pickup query", "Drop query"), calls.toSet())
         assertTrue(vm.uiState.value.hasResolvedEndpoints)
-        vm.onDropChange("Drop stale", context)
+        vm.selectCustomLocation("Drop stale", true, context)
         advanceTimeBy(550)
         vm.selectPlaceResult(PlaceSearchResult("Chosen", "", 14.0, 78.0), true)
         advanceUntilIdle()
@@ -124,16 +126,28 @@ class RideFareViewModelTest {
         assertEquals(28.6, vm.uiState.value.pickupLat!!, 0.0)
     }
 
-    @Test fun `manual target checks use saved conditions instead of the currently viewed route`() = runTest(dispatcher) {
-        val vm = model()
-        vm.onTrafficChange(TrafficCondition.LIGHT)
-        vm.onWeatherChange(WeatherOrTimeCondition.REGULAR)
-        val saved = favorite().copy(priceThreshold = 1)
-        val expected = com.example.util.FareCalculator.calculateAllRides(saved.pickupName, saved.dropName,
-            saved.distanceKm, TrafficCondition.HEAVY, WeatherOrTimeCondition.RAIN).minOf { it.totalFare }
-        vm.checkPriceTarget(saved, context)
-        assertTrue(vm.uiState.value.notificationMessage!!.contains("Estimated ₹$expected"))
-        assertTrue(vm.uiState.value.notificationMessage!!.contains("above"))
+    @Test fun `missing live prices never create sample quotes rankings or price notifications`() = runTest(dispatcher) {
+        val vm = model(); resolve(vm); runCurrent()
+        vm.recalculateFares(true); runCurrent()
+        assertTrue(vm.uiState.value.allRideOptions.isEmpty())
+        assertNull(vm.uiState.value.cheapestOverall)
+        assertTrue(vm.uiState.value.providerComparisons.isEmpty())
+        assertTrue(RideRepository(dao).searchHistory.first().isEmpty())
+        vm.checkPriceTarget(favorite(), context)
+        assertTrue(vm.uiState.value.notificationMessage!!.contains("Live prices are unavailable"))
+        assertFalse(vm.uiState.value.notificationMessage!!.contains("₹"))
+    }
+
+    @Test fun `typing never silently accepts first geocoder match`() = runTest(dispatcher) {
+        var calls = 0
+        val vm = RideFareViewModel(RideRepository(dao), geocode = { _, _, _ ->
+            calls++; 12.9 to 77.6
+        })
+        vm.onPickupChange("A business", context)
+        vm.onDropChange("Another business", context)
+        advanceUntilIdle()
+        assertEquals(0, calls)
+        assertFalse(vm.uiState.value.hasResolvedEndpoints)
     }
 
     @Test fun `routing failure is explicit and manual distance is not overwritten by in-flight routing`() = runTest(dispatcher) {

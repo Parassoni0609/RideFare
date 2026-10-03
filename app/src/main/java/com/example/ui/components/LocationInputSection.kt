@@ -109,6 +109,12 @@ fun LocationInputSection(
     onSaveRouteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (com.example.BuildConfig.GOOGLE_PLACES_API_KEY.isNotBlank()) {
+        GoogleLocationInputSection(pickup, drop, currentCity, isLocating, pickupLat, pickupLng,
+            onPickupChange, onDropChange, onSwapClick, onCurrentLocationClick,
+            onSelectPlaceResult, onSaveRouteClick, modifier)
+        return
+    }
     val context = LocalContext.current
     var activeField by remember { mutableStateOf(ActiveSearchField.NONE) }
     var selectedCategoryFilter by remember(activeField, currentCity.id) { mutableStateOf("all") }
@@ -177,6 +183,8 @@ fun LocationInputSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            Text("Limited place search: Google search is not enabled in this build. Some businesses and addresses may be missing.",
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -555,51 +563,8 @@ fun LocationInputSection(
                             )
                         }
 
-                        // Custom query fallback
-                        if (activeQuery.isNotBlank() && !activeQuery.startsWith("Current Location")) {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable {
-                                        onSelectCustomText(activeQuery, activeField == ActiveSearchField.DROP)
-                                        activeField = ActiveSearchField.NONE
-                                    },
-                                color = MaterialTheme.colorScheme.surface,
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Place,
-                                        contentDescription = "Custom location",
-                                        tint = if (isSearchingPickup) EmeraldSavings else ElectricBluePrimary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = "Search exact: \"$activeQuery\"",
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        )
-                                        Text(
-                                            text = "Query map coordinates for this text",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 10.sp,
-                                                color = Slate400
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        // Coordinates come only from an explicitly selected result.
+
                     }
                 }
             }
