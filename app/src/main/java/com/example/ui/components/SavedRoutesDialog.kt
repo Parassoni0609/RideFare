@@ -130,7 +130,7 @@ fun SavedRoutesDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No saved routes yet.\nTap the bookmark icon to save your regular commutes and set manual price targets.",
+                                text = "No saved routes yet.\nTap the bookmark icon to save your regular commutes for later.",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -189,7 +189,7 @@ fun SavedRoutesDialog(
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
-                                                text = "Best: ${item.cheapestService} @ ₹${item.cheapestFare}",
+                                                text = "Previous route • old sample prices are no longer shown",
                                                 style = MaterialTheme.typography.labelSmall.copy(
                                                     color = EmeraldSavings,
                                                     fontWeight = FontWeight.Bold
@@ -327,142 +327,8 @@ private fun SavedRouteCardItem(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // Dedicated Price Drop Alert Section
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = if (route.priceAlertEnabled) EmeraldSavings.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(10.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (route.priceAlertEnabled) EmeraldSavings.copy(alpha = 0.35f) else Slate200
-                )
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (route.priceAlertEnabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                                contentDescription = "Manual Price Target",
-                                tint = if (route.priceAlertEnabled) EmeraldSavings else Slate400,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Manual Price Target",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    color = if (route.priceAlertEnabled) EmeraldSavings else Slate700
-                                )
-                            )
-                        }
-
-                        Switch(
-                            checked = route.priceAlertEnabled,
-                            onCheckedChange = { isChecked ->
-                                onToggleAlert(isChecked, route.priceThreshold)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = EmeraldSavings,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = Slate200
-                            ),
-                            modifier = Modifier.size(width = 38.dp, height = 24.dp)
-                        )
-                    }
-
-                    // Expanded Threshold Selector when Alert is Active
-                    AnimatedVisibility(visible = route.priceAlertEnabled) {
-                        Column(modifier = Modifier.padding(top = 4.dp)) {
-                            Text(
-                                text = "Manual target: ₹${route.priceThreshold} • no background monitoring",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    color = EmeraldSavings,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            // Quick Threshold Selector Chips
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                quickThresholds.forEach { price ->
-                                    val isSelected = route.priceThreshold == price
-                                    Surface(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .clickable { onToggleAlert(true, price) }
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) EmeraldSavings else Slate200,
-                                                RoundedCornerShape(6.dp)
-                                            ),
-                                        color = if (isSelected) EmeraldSavings else Color.White
-                                    ) {
-                                        Text(
-                                            text = "≤ ₹$price",
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp,
-                                                color = if (isSelected) Color.White else Slate700
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            // Test Alert notification button
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                Surface(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable(onClick = onTestAlert)
-                                        .border(1.dp, EmeraldSavings.copy(alpha = 0.5f), RoundedCornerShape(6.dp)),
-                                    color = Color.White
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.NotificationsActive,
-                                            contentDescription = null,
-                                            tint = EmeraldSavings,
-                                            modifier = Modifier.size(11.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "Check Estimate",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                color = EmeraldSavings,
-                                                fontSize = 9.sp
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            Text("Live price checks unavailable. Open this route, then check in a provider app.",
+                style = MaterialTheme.typography.bodySmall)
         }
     }
 }

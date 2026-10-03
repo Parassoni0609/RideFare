@@ -30,14 +30,9 @@ class RideRepository(private val rideDao: RideDao) {
             com.example.data.model.RideProvider.RAPIDO
         )
     ): List<RideOption> {
-        return FareCalculator.calculateAllRides(
-            pickup = pickup,
-            drop = drop,
-            distanceKm = distanceKm,
-            traffic = traffic,
-            weather = weather,
-            availableProviders = availableProviders
-        )
+        // No approved live quote integration exists. Missing prices must stay missing;
+        // never substitute the sample calculator for provider fares.
+        return emptyList()
     }
 
     suspend fun getSavedRoute(id: Long): SavedRoute? = rideDao.getSavedRoute(id)

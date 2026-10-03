@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
 }
+
+val placesProperties = Properties().apply {
+  val propertiesFile = rootProject.file("local.properties")
+  if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
+}
+val placesApiKey = providers.environmentVariable("GOOGLE_PLACES_API_KEY")
+  .orElse(provider { placesProperties.getProperty("GOOGLE_PLACES_API_KEY", "") }).get().trim()
 
 android {
   namespace = "com.example"
@@ -12,8 +21,10 @@ android {
     applicationId = "com.aistudio.ridefare.xkrqzp"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.2"
+    versionCode = 4
+    versionName = "1.3"
+
+    buildConfigField("String", "GOOGLE_PLACES_API_KEY", "\"" + placesApiKey.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -63,6 +74,7 @@ android {
 }
 
 dependencies {
+  implementation("com.google.android.libraries.places:places:5.1.1")
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.compose.material.icons.core)

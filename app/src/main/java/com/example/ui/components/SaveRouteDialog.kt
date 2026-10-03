@@ -69,7 +69,7 @@ fun SaveRouteDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Name this route for fast 1-tap rate comparison:",
+                    text = "Name this route to open it again quickly:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -92,111 +92,14 @@ fun SaveRouteDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Price Alert Toggle Section
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (priceAlertEnabled) EmeraldSavings.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (priceAlertEnabled) EmeraldSavings.copy(alpha = 0.4f) else Slate200
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (priceAlertEnabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                                    contentDescription = null,
-                                    tint = if (priceAlertEnabled) EmeraldSavings else Slate400,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Column {
-                                    Text(
-                                        text = "Manual Price Target",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (priceAlertEnabled) EmeraldSavings else Slate700
-                                        )
-                                    )
-                                    Text(
-                                        text = "Check estimates manually; no background alerts",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 9.sp,
-                                            color = Slate400
-                                        )
-                                    )
-                                }
-                            }
+                Text("Price checks are unavailable until live provider prices are connected.",
+                    style = MaterialTheme.typography.bodySmall)
 
-                            Switch(
-                                checked = priceAlertEnabled,
-                                onCheckedChange = { priceAlertEnabled = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = EmeraldSavings,
-                                    uncheckedThumbColor = Color.White,
-                                    uncheckedTrackColor = Slate200
-                                ),
-                                modifier = Modifier.size(width = 38.dp, height = 24.dp)
-                            )
-                        }
-
-                        AnimatedVisibility(visible = priceAlertEnabled) {
-                            Column(modifier = Modifier.padding(top = 8.dp)) {
-                                Text(
-                                    text = "Price Target: ≤ ₹$priceThreshold",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = EmeraldSavings
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    quickThresholds.forEach { price ->
-                                        val isSelected = priceThreshold == price
-                                        Surface(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable { priceThreshold = price }
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) EmeraldSavings else Slate200,
-                                                    RoundedCornerShape(6.dp)
-                                                ),
-                                            color = if (isSelected) EmeraldSavings else Color.White
-                                        ) {
-                                            Text(
-                                                text = "≤ ₹$price",
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.sp,
-                                                    color = if (isSelected) Color.White else Slate700
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(title, priceAlertEnabled, priceThreshold) },
+                onClick = { onSave(title, false, priceThreshold) },
                 modifier = Modifier.testTag("confirm_save_route_button")
             ) {
                 Text("Save")

@@ -41,8 +41,13 @@ object IntentHelper {
         dropLat: Double? = null,
         dropLng: Double? = null
     ) {
-        val providerName = option.provider.displayName
-        val packageName = option.provider.packageName
+        openProvider(context, option.provider, pickup, drop, pickupLat, pickupLng, dropLat, dropLng)
+    }
+
+    fun openProvider(context: Context, provider: RideProvider, pickup: String, drop: String,
+                     pickupLat: Double?, pickupLng: Double?, dropLat: Double?, dropLng: Double?) {
+        val providerName = provider.displayName
+        val packageName = provider.packageName
 
         if (!validCoordinates(pickupLat, pickupLng) || !validCoordinates(dropLat, dropLng) ||
             pickup.isBlank() || drop.isBlank()) {
@@ -54,7 +59,7 @@ object IntentHelper {
         val dLat = dropLat!!
         val dLng = dropLng!!
 
-        if (option.provider == RideProvider.UBER) {
+        if (provider == RideProvider.UBER) {
             val native = uberUri(pickup, drop, pLat, pLng, dLat, dLng, false)
             // Try each explicit package before any implicit/browser fallback.
             if (tryLaunchUri(context, native.toString(), "com.ubercab") ||
